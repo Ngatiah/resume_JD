@@ -163,7 +163,7 @@ if st.button("🚀 Analyze & Rank"):
         #         st.write(f"- {g}")
 
         st.subheader("📊 Ranked Candidates")
-        st.dataframe(df[["Candidate", "Match Score", "Matches", "Gaps"]], use_container_width=True)
+        # st.dataframe(df[["Candidate", "Match Score", "Matches", "Gaps"]], use_container_width=True)
 
         st.dataframe(
             df.style.highlight_max(axis=0, subset=['Match Score'], color='lightgreen'),
