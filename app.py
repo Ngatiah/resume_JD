@@ -5,6 +5,7 @@ from sentence_transformers import SentenceTransformer, util
 import PyPDF2
 import joblib
 import re
+import torch
 
 # 1. Page Configuration
 st.set_page_config(page_title="AI Resume Job Matcher", layout="wide")
