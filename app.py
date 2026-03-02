@@ -12,11 +12,11 @@ st.set_page_config(page_title="AI Resume Matcher", layout="wide")
 # 2. Load my pretrained SBERT Model (Cached for performance)
 @st.cache_resource
 def load_model():
-    model_path = 'model_assets/sbert_model'
-    model = SentenceTransformer(model_path)
+    # model_path = 'model_assets/sbert_model'
+    model = SentenceTransformer('all-MiniLM-L6-v2')
 
     # Load the MinMaxScaler
-    scaler_path = 'model_assets/semantic_scaler.pkl'
+    scaler_path = 'semantic_scaler.pkl'
     scaler = joblib.load(scaler_path)
 
     return model, scaler
