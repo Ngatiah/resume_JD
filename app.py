@@ -239,7 +239,8 @@ def analyze_skills(jd_text, resume_text):
     for i, score in enumerate(max_scores):
         skill_name = jd_requirements[i]
         if score.item() > 0.65:
-            matched.append((skill_name, round(score.item()*100, 2)))
+            # matched.append((skill_name, round(score.item()*100, 2)))
+            matched.append(skill_name)
         else:
             # Categorize the Gap
             low_skill = skill_name.lower()
