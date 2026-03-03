@@ -156,7 +156,8 @@ def extract_jd(jd_text):
     # 1. Expanded Triggers
     trigger_words = [
         "key responsibilities", "required skills", "qualifications", 
-        "what you will do", "requirements", "core competencies"
+        "what you will do", "requirements", "core competencies", 
+        "education", "experience", "education and experience",
     ]
 
     start_idx = 0
@@ -173,7 +174,8 @@ def extract_jd(jd_text):
     # These words represent section titles, not actual requirements.
     header_blacklist = [
         "responsibilities", "skills", "qualifications", "requirements", 
-        "preferred", "about the job", "job summary"
+        "preferred", "about the job", "job summary", "education and experience",
+        "education", "experience"
     ]
     
     requirements = []
