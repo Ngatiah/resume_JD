@@ -399,8 +399,8 @@ if st.button("🚀 Analyze & Rank"):
                     # "Matches": ", ".join(matches),
                     "Matches": ", ".join([f"{m[0]} ({m[1]}%)" for m in matches]),
                     # "Gaps": ", ".join(gaps[:5]),
-                    "Gaps": ", ".join([item for sublist in gaps.values() for item in sublist][:3]),
-                    # "Gaps": ", ".join(gaps),
+                    # "Gaps": ", ".join([item for sublist in gaps.values() for item in sublist][:3]),
+                    "Gaps": ", ".join(gaps),
                     "Full_Matches": matches,
                     # "Full_Gaps": gaps
                     "Full_Gaps": gaps      
