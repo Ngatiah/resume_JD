@@ -156,7 +156,8 @@ if st.button("🚀 Analyze & Rank"):
                 
                 # Calibrated Score
                 calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
-                final_score = round(calibrated * 100, 2)
+                final_score = float(np.clip(calibrated * 100, 0, 100))
+                final_score = round(final_score, 2)
                 
                 # 2. Skill-Level Audit (Using our optimized batch function)
                 matches, gaps = analyze_skills(jd_input, text)
