@@ -34,117 +34,6 @@ def chunk_resume(resume_text):
     chunks = re.split(r'[,.\n•●/-]', resume_text)
     return [c.strip() for c in chunks if len(c.strip()) > 3]
 
-# def extract_jd(jd_text):
-#     """
-#     Robust JD extraction without fragile regex blocks.
-#     """
-
-#     jd_text = jd_text.lower()
-
-#     # Keep only the meaningful section onward
-#     trigger_words = [
-#         "key responsibilities",
-#         "required skills",
-#         "required qualifications",
-#         "preferred qualifications"
-#     ]
-
-#     start_idx = None
-#     for word in trigger_words:
-#         idx = jd_text.find(word)
-#         if idx != -1:
-#             start_idx = idx
-#             break
-
-#     if start_idx is None:
-#         return []
-
-#     relevant_text = jd_text[start_idx:]
-
-#     # Split into lines
-#     lines = relevant_text.split("\n")
-
-#     requirements = []
-#     for line in lines:
-#         line = line.strip()
-
-#         if (
-#             len(line) > 25
-#             and not any(x in line for x in ["about the job", "rate:", "engagement", "title:"])
-#         ):
-#             requirements.append(line)
-
-#     return requirements[:15]
-
-# def extract_jd(jd_text):
-#     """
-#     Enhanced JD extraction that handles varied formatting and missing headers.
-#     """
-#     jd_clean = jd_text.lower()
-    
-#     # 1. Expanded Triggers (covering more industries)
-#     trigger_words = [
-#         "key responsibilities", "required skills", "qualifications", 
-#         "what you will do", "experience you'll need", "requirements",
-#         "job description", "core competencies", "technical skills",
-#         "Required Skills and Qualifications"
-#     ]
-
-#     start_idx = 0
-#     for word in trigger_words:
-#         idx = jd_clean.find(word)
-#         if idx != -1:
-#             start_idx = idx
-#             break
-
-#     # 2. Fallback: If no headers, take the whole text but skip "About" intro
-#     relevant_text = jd_clean[start_idx:]
-
-#     # 3. Smart Filtering of lines
-#     lines = relevant_text.split("\n")
-#     headers = ["key responsibilities", "required skills", "qualifications", "preferred"]
-#     # requirements = []
-#     requirements = [
-#         l.strip() for l in lines 
-#         if len(l.strip()) > 25 
-#         and not any(h == l.strip().lower() for h in headers)
-#         and ":" not in l[:15] # Skip things like "Rate: $100"
-#     ]
-    # return requirements[:15]
-    
-    # List of "Noise" phrases to discard
-    # stop_phrases = ["about the company", "equal opportunity", "how to apply", "salary range", "rate:", "engagement", "title:"]
-
-    # for line in lines:
-    #     line = line.strip()
-    #     # Filter for quality: not too short, not a header, not noise
-    #     if (
-    #         # 15 < len(line) < 300  # Requirements are usually sentences
-    #         len(line) >  25  # Requirements are usually sentences
-    #         and not any(stop in line for stop in stop_phrases)
-    #         and (line.startswith(('-', '•', '*', '○', '●')) or any(char.isdigit() for char in line[:2]))
-    #     ):
-    #         # Clean bullet points for better SBERT encoding
-    #         cleaned_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', line)
-    #         requirements.append(cleaned_line)
-
-    # # 4. Final Fallback: If no bullet points found, take the top 10 meaningful sentences
-    # # if not requirements:
-    # #     sentences = re.split(r'(?<=[.!?]) +', relevant_text)
-    # #     requirements = [s.strip() for s in sentences if 30 < len(s.strip()) < 200][:10]
-
-    # return requirements[:20]
-    # lines = relevant_text.split("\n")
-    # requirements = [l.strip() for l in lines if len(l.strip()) > 20]
-    # return requirements[:15]
-    
-    # for l in lines:
-    #     clean_l = l.strip()
-    #     # Only keep lines that aren't just headers and are long enough to be real requirements
-    #     if len(clean_l) > 25 and not any(h in clean_l.lower() for h in headers):
-    #         requirements.append(clean_l)
-            
-    # return requirements[:15]
 
 
 def extract_jd(jd_text):
@@ -202,13 +91,67 @@ def extract_jd(jd_text):
     return requirements[:15]
 
 
+# def analyze_skills(jd_text, resume_text):
+#     """Matches JD requirements to Resume text using SBERT"""
+#     jd_requirements = extract_jd(jd_text)[:20] # Focus on top 20 chunks
+#     resume_chunks = chunk_resume(resume_text)
+    
+#     if not jd_requirements or not resume_chunks:
+#         return [], jd_requirements
+    
+#     # batch-encode for speed
+#     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
+#     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
+    
+#     # Use matrix multiplication for all scores at once
+#     cosine_scores = util.cos_sim(jd_embs, res_embs) 
+#     # Now find the max score for each JD requirement
+#     max_scores, _ = torch.max(cosine_scores, dim=1)
+
+#     # matched = []
+#     # gaps = []
+
+#     matched = []
+#     gaps = {
+#         "Technical/AI": [],
+#         "Domain Expertise": [],
+#         "Soft Skills/Other": []
+#     }
+
+#     # for i, score in enumerate(max_scores):
+#     #     skill_name = jd_requirements[i]
+#     #     if score.item() > 0.65: # .item() converts tensor to float
+#     #     # if score.item() > 0.72: # .item() converts tensor to float
+#     #     # if score.item() > strictness: # .item() converts tensor to float
+#     #         # matched.append(skill_name)
+#     #         matched.append((skill_name, round(score.item()*100,2)))
+#     #     else:
+#     #         gaps.append(skill_name)
+
+#     for i, score in enumerate(max_scores):
+#         skill_name = jd_requirements[i]
+#         if score.item() > 0.65:
+#             # matched.append((skill_name, round(score.item()*100, 2)))
+#             matched.append(skill_name)
+#         else:
+#             # Categorize the Gap
+#             low_skill = skill_name.lower()
+#             if any(k in low_skill for k in ['ai', 'data', 'algorithm', 'software', 'dataset']):
+#                 gaps["Technical/AI"].append(skill_name)
+#             elif any(k in low_skill for k in ['soil', 'plant', 'agronomy', 'crop', 'physiology']):
+#                 gaps["Domain Expertise"].append(skill_name)
+#             else:
+#                 gaps["Soft Skills/Other"].append(skill_name)
+            
+#     # return list(set(matched)), list(set(gaps))
+#     return list(set(matched)), gaps
+
 def analyze_skills(jd_text, resume_text):
-    """Matches JD requirements to Resume text using SBERT"""
-    jd_requirements = extract_jd(jd_text)[:20] # Focus on top 20 chunks
+    jd_requirements = extract_jd(jd_text)
     resume_chunks = chunk_resume(resume_text)
     
     if not jd_requirements or not resume_chunks:
-        return [], jd_requirements
+        return [], {"Technical & ML": [], "Stats & Research": [], "Background & Soft Skills": []}
     
     # batch-encode for speed
     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
@@ -219,42 +162,37 @@ def analyze_skills(jd_text, resume_text):
     # Now find the max score for each JD requirement
     max_scores, _ = torch.max(cosine_scores, dim=1)
 
-    # matched = []
-    # gaps = []
-
     matched = []
     gaps = {
-        "Technical/AI": [],
-        "Domain Expertise": [],
-        "Soft Skills/Other": []
+        "Technical & Machine Learning": [],
+        "Statistics & Experimental Design": [],
+        "Background & Soft Skills": []
     }
 
-    # for i, score in enumerate(max_scores):
-    #     skill_name = jd_requirements[i]
-    #     if score.item() > 0.65: # .item() converts tensor to float
-    #     # if score.item() > 0.72: # .item() converts tensor to float
-    #     # if score.item() > strictness: # .item() converts tensor to float
-    #         # matched.append(skill_name)
-    #         matched.append((skill_name, round(score.item()*100,2)))
-    #     else:
-    #         gaps.append(skill_name)
+    # 1. Tech/ML: Python, SQL, ML Models, Production code
+    tech_k = ['python', 'sql', 'machine learning', 'ml', 'production', 'algorithms', 'data manipulation']
+    
+    # 2. Stats/Research: A/B tests, Causal Inference, Probability, Experiments
+    stats_k = ['statistics', 'statistical', 'causal', 'inference', 'a/b', 'experiment', 'probability', 'quantitative']
+    
+    # 3. Background/Education: Degrees, Years of Exp, Communication
+    background_k = ['degree', 'bachelor', 'master', 'phd', 'experience', 'years', 'communication', 'remote']
 
     for i, score in enumerate(max_scores):
         skill_name = jd_requirements[i]
-        if score.item() > 0.65:
-            # matched.append((skill_name, round(score.item()*100, 2)))
-            matched.append(skill_name)
+        low_skill = skill_name.lower()
+        score_val = round(score.item() * 100, 2)
+        
+        if score_val > 65:
+            matched.append((skill_name, score_val))
         else:
-            # Categorize the Gap
-            low_skill = skill_name.lower()
-            if any(k in low_skill for k in ['ai', 'data', 'algorithm', 'software', 'dataset']):
-                gaps["Technical/AI"].append(skill_name)
-            elif any(k in low_skill for k in ['soil', 'plant', 'agronomy', 'crop', 'physiology']):
-                gaps["Domain Expertise"].append(skill_name)
+            if any(k in low_skill for k in tech_k):
+                gaps["Technical & Machine Learning"].append(skill_name)
+            elif any(k in low_skill for k in stats_k):
+                gaps["Statistics & Experimental Design"].append(skill_name)
             else:
-                gaps["Soft Skills/Other"].append(skill_name)
-            
-    # return list(set(matched)), list(set(gaps))
+                gaps["Background & Soft Skills"].append(skill_name)
+                
     return list(set(matched)), gaps
 
 
