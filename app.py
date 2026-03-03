@@ -288,8 +288,10 @@ if st.button("🚀 Analyze & Rank"):
                 results.append({
                     "Candidate": file.name,
                     "Match Score": final_score,
-                    "Matches": ", ".join(matches[:5]),
-                    "Gaps": ", ".join(gaps[:5]),
+                    # "Matches": ", ".join(matches[:5]),
+                    "Matches": ", ".join(matches),
+                    # "Gaps": ", ".join(gaps[:5]),
+                    "Gaps": ", ".join(gaps),
                     "Full_Matches": matches,
                     "Full_Gaps": gaps
                 })
