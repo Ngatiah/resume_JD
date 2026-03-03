@@ -33,6 +33,47 @@ def chunk_resume(resume_text):
     chunks = re.split(r'[,.\n•●/-]', resume_text)
     return [c.strip() for c in chunks if len(c.strip()) > 3]
 
+# def extract_jd(jd_text):
+#     """
+#     Robust JD extraction without fragile regex blocks.
+#     """
+
+#     jd_text = jd_text.lower()
+
+#     # Keep only the meaningful section onward
+#     trigger_words = [
+#         "key responsibilities",
+#         "required skills",
+#         "required qualifications",
+#         "preferred qualifications"
+#     ]
+
+#     start_idx = None
+#     for word in trigger_words:
+#         idx = jd_text.find(word)
+#         if idx != -1:
+#             start_idx = idx
+#             break
+
+#     if start_idx is None:
+#         return []
+
+#     relevant_text = jd_text[start_idx:]
+
+#     # Split into lines
+#     lines = relevant_text.split("\n")
+
+#     requirements = []
+#     for line in lines:
+#         line = line.strip()
+
+#         if (
+#             len(line) > 25
+#             and not any(x in line for x in ["about the job", "rate:", "engagement", "title:"])
+#         ):
+#             requirements.append(line)
+
+#     return requirements[:15]
 
 def extract_jd(jd_text):
     """
@@ -47,7 +88,7 @@ def extract_jd(jd_text):
         "job description", "core competencies", "technical skills"
     ]
 
-    start_idx = -1
+    start_idx = None
     for word in trigger_words:
         idx = jd_clean.find(word)
         if idx != -1:
@@ -55,23 +96,24 @@ def extract_jd(jd_text):
             break
 
     # 2. Fallback: If no headers, take the whole text but skip "About" intro
-    if start_idx == -1:
-        relevant_text = jd_clean
-    else:
-        relevant_text = jd_clean[start_idx:]
+    if start_idx == None:
+        return []
+    
+    relevant_text = jd_clean[start_idx:]
 
     # 3. Smart Filtering of lines
     lines = relevant_text.split("\n")
     requirements = []
     
     # List of "Noise" phrases to discard
-    stop_phrases = ["about the company", "equal opportunity", "how to apply", "salary range"]
+    stop_phrases = ["about the company", "equal opportunity", "how to apply", "salary range", "rate:", "engagement", "title:"]
 
     for line in lines:
         line = line.strip()
         # Filter for quality: not too short, not a header, not noise
         if (
-            15 < len(line) < 300  # Requirements are usually sentences
+            # 15 < len(line) < 300  # Requirements are usually sentences
+            len(line) >  25  # Requirements are usually sentences
             and not any(stop in line for stop in stop_phrases)
             and (line.startswith(('-', '•', '*', '○', '●')) or any(char.isdigit() for char in line[:2]))
         ):
@@ -80,21 +122,12 @@ def extract_jd(jd_text):
             requirements.append(cleaned_line)
 
     # 4. Final Fallback: If no bullet points found, take the top 10 meaningful sentences
-    if not requirements:
-        sentences = re.split(r'(?<=[.!?]) +', relevant_text)
-        requirements = [s.strip() for s in sentences if 30 < len(s.strip()) < 200][:10]
+    # if not requirements:
+    #     sentences = re.split(r'(?<=[.!?]) +', relevant_text)
+    #     requirements = [s.strip() for s in sentences if 30 < len(s.strip()) < 200][:10]
 
     return requirements[:20]
 
-# st.header("Step 3: Matching Strictness")
-# strictness = st.slider(
-#     "Similarity Threshold", 
-#     min_value=0.60, 
-#     max_value=0.90, 
-#     value=0.72, 
-#     step=0.01,
-#     help="Higher = more strict. Lower = finds more synonyms."
-# )
 
 def analyze_skills(jd_text, resume_text):
     """Matches JD requirements to Resume text using SBERT"""
@@ -229,41 +262,10 @@ if st.button("🚀 Analyze & Rank"):
                 
                 # Calibrated Score
                 calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
-                # Apply after scaling if numbers are still too high
                 final_score = sigmoid_calibration(calibrated) * 100
-                # final_score = float(np.clip(calibrated * 100, 0, 100))
-                # final_score = round(final_score, 2)
-                
+
                 # 2. Skill-Level Audit (Using our optimized batch function)
                 matches, gaps = analyze_skills(jd_input, text)
-
-                # total_reqs = len(matches) + len(gaps)
-                # # Avoid division by zero and cap denominator to normalize across different JD lengths
-                # norm_denom = max(total_reqs, 5) 
-                # coverage_ratio = len(matches) / norm_denom
-
-                # # Final Weighted Score
-                # # 40% based on general semantic context
-                # # 60% based on specific requirement coverage
-                # final_score = ((raw_sim * 0.4) + (min(coverage_ratio, 1.0) * 0.6)) * 100
-
-                # # Optional: Semantic "Floor" - if they don't hit at least 1 match, 
-                # # keep the score very low regardless of raw similarity.
-                # if len(matches) == 0:
-                #     final_score = min(final_score, 30.0)
-
-                # total_reqs = len(matches) + len(gaps)
-                # if total_reqs > 0:
-                #     coverage_ratio = np.sqrt(len(matches) / max(len(matches) + len(gaps), 1))
-                # else:
-                #     coverage_ratio = 0
-
-                # final_score = (
-                #     (raw_sim * 0.4) +
-                #     (coverage_ratio * 0.6)
-                # ) * 100
-
-                # final_score = round(final_score, 2)
 
                 results.append({
                     "Candidate": file.name,
