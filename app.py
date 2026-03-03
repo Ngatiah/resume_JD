@@ -25,18 +25,17 @@ def extract_text(file):
     pdf = PyPDF2.PdfReader(file)
     return " ".join([page.extract_text() or "" for page in pdf.pages])
 
-# def get_keywords(text):
-#     """Simple cleaner to extract meaningful chunks for comparison"""
-#     # Removes special chars and splits by commas/bullets/newlines
-#     chunks = re.split(r'[,.\n•●/-]', text)
-#     return [c.strip() for c in chunks if len(c.strip()) > 3]
+def chunk_resume(resume_text):
+    """Simple cleaner to extract meaningful chunks for comparison"""
+    # Removes special chars and splits by commas/bullets/newlines
+    chunks = re.split(r'[,.\n•●/-]', text)
+    return [c.strip() for c in chunks if len(c.strip()) > 3]
 
-def get_keywords(jd_text):
+def extract_jd(jd_text):
     """
     Extract meaningful skill/responsibility requirements 
     from JD using structured section parsing.
     """
-
     # Normalize whitespace
     jd_text = re.sub(r'\r', '', jd_text)
 
@@ -103,8 +102,8 @@ def get_keywords(jd_text):
 
 def analyze_skills(jd_text, resume_text):
     """Matches JD requirements to Resume text using SBERT"""
-    jd_requirements = get_keywords(jd_text)[:20] # Focus on top 20 chunks
-    resume_chunks = get_keywords(resume_text)
+    jd_requirements = extract_jd(jd_text)[:20] # Focus on top 20 chunks
+    resume_chunks = chunk_resume(resume_text)
     
     if not jd_requirements or not resume_chunks:
         return [], jd_requirements
@@ -123,7 +122,8 @@ def analyze_skills(jd_text, resume_text):
 
     for i, score in enumerate(max_scores):
         skill_name = jd_requirements[i]
-        if score.item() > 0.65: # .item() converts tensor to float
+        # if score.item() > 0.65: # .item() converts tensor to float
+        if score.item() > 0.72: # .item() converts tensor to float
             matched.append(skill_name)
         else:
             gaps.append(skill_name)
