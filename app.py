@@ -85,7 +85,8 @@ def extract_jd(jd_text):
     trigger_words = [
         "key responsibilities", "required skills", "qualifications", 
         "what you will do", "experience you'll need", "requirements",
-        "job description", "core competencies", "technical skills"
+        "job description", "core competencies", "technical skills",
+        "Required Skills and Qualifications"
     ]
 
     start_idx = None
