@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer, util
 import PyPDF2
-# import joblib
+import joblib
 import re
 import torch
 
@@ -15,12 +15,12 @@ st.set_page_config(page_title="AI Resume Job Matcher", layout="wide")
 def load_assets():
     # model = SentenceTransformer('all-MiniLM-L6-v2')
     model = SentenceTransformer('all-mpnet-base-v2')
-    # scaler = joblib.load('semantic_scaler_2.pkl')
-    # return model, scaler
+    scaler = joblib.load('semantic_scaler_2.pkl')
+    return model, scaler
     return model
 
-# model, scaler = load_assets()
-model = load_assets()
+model, scaler = load_assets()
+# model = load_assets()
 
 # --- HELPER FUNCTIONS ---
 def extract_text(file):
@@ -193,6 +193,15 @@ def generate_pdf_report(df):
     buffer.seek(0)
     return buffer
 
+
+import math
+
+def sigmoid_calibration(score):
+    # This keeps the score mapping 1:1 in the middle but 
+    # prevents it from exploding at the top/bottom
+    return 1 / (1 + math.exp(-score))
+
+
 # --- UI LAYOUT ---
 st.title("🎯 Semantic Resume-JD Matcher")
 st.markdown("Rank resumes based on **meaning**, and see exactly what's missing.")
@@ -219,7 +228,9 @@ if st.button("🚀 Analyze & Rank"):
                 raw_sim = util.cos_sim(jd_emb, res_emb).item()
                 
                 # Calibrated Score
-                # calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
+                calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
+                # Apply after scaling if numbers are still too high
+                final_score = sigmoid_calibration(calibrated) * 100
                 # final_score = float(np.clip(calibrated * 100, 0, 100))
                 # final_score = round(final_score, 2)
                 
@@ -241,18 +252,18 @@ if st.button("🚀 Analyze & Rank"):
                 # if len(matches) == 0:
                 #     final_score = min(final_score, 30.0)
 
-                total_reqs = len(matches) + len(gaps)
-                if total_reqs > 0:
-                    coverage_ratio = np.sqrt(len(matches) / max(len(matches) + len(gaps), 1))
-                else:
-                    coverage_ratio = 0
+                # total_reqs = len(matches) + len(gaps)
+                # if total_reqs > 0:
+                #     coverage_ratio = np.sqrt(len(matches) / max(len(matches) + len(gaps), 1))
+                # else:
+                #     coverage_ratio = 0
 
-                final_score = (
-                    (raw_sim * 0.4) +
-                    (coverage_ratio * 0.6)
-                ) * 100
+                # final_score = (
+                #     (raw_sim * 0.4) +
+                #     (coverage_ratio * 0.6)
+                # ) * 100
 
-                final_score = round(final_score, 2)
+                # final_score = round(final_score, 2)
 
                 results.append({
                     "Candidate": file.name,
