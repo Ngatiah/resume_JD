@@ -307,7 +307,14 @@ def generate_pdf_report(df):
 
         if row["Full_Gaps"]:
             for g in row["Full_Gaps"]:
-                elements.append(Paragraph(f"• {g}", styles['Normal']))
+                if isinstance(g, tuple):
+                    # elements.append(Paragraph(f"• {g}", styles['Normal']))
+                    elements.append(Paragraph(
+                                f"• {g[0]}  (Confidence: {g[1]}%)",
+                                styles['Normal']
+                            ))
+                else:
+                            elements.append(Paragraph(f"• {g}", styles['Normal']))
         else:
             elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
 
