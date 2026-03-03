@@ -13,9 +13,10 @@ st.set_page_config(page_title="AI Resume Job Matcher", layout="wide")
 # 2. Load Assets
 @st.cache_resource
 def load_assets():
-    # model = SentenceTransformer('all-MiniLM-L6-v2')
-    model = SentenceTransformer('all-mpnet-base-v2')
-    scaler = joblib.load('semantic_scaler_2.pkl')
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    # model = SentenceTransformer('all-mpnet-base-v2')
+    # scaler = joblib.load('semantic_scaler_2.pkl')
+    scaler = joblib.load('semantic_scaler.pkl')
     return model, scaler
     return model
 
