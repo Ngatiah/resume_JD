@@ -89,7 +89,7 @@ def extract_jd(jd_text):
         "Required Skills and Qualifications"
     ]
 
-    start_idx = None
+    start_idx = 0
     for word in trigger_words:
         idx = jd_clean.find(word)
         if idx != -1:
@@ -97,14 +97,19 @@ def extract_jd(jd_text):
             break
 
     # 2. Fallback: If no headers, take the whole text but skip "About" intro
-    if start_idx == None:
-        relevant_text = jd_clean
-    else:
-        relevant_text = jd_clean[start_idx:]
+    relevant_text = jd_clean[start_idx:]
 
     # 3. Smart Filtering of lines
     lines = relevant_text.split("\n")
-    requirements = []
+    headers = ["key responsibilities", "required skills", "qualifications", "preferred"]
+    # requirements = []
+    requirements = [
+        l.strip() for l in lines 
+        if len(l.strip()) > 25 
+        and not any(h == l.strip().lower() for h in headers)
+        and ":" not in l[:15] # Skip things like "Rate: $100"
+    ]
+    return requirements[:15]
     
     # List of "Noise" phrases to discard
     # stop_phrases = ["about the company", "equal opportunity", "how to apply", "salary range", "rate:", "engagement", "title:"]
@@ -131,15 +136,14 @@ def extract_jd(jd_text):
     # lines = relevant_text.split("\n")
     # requirements = [l.strip() for l in lines if len(l.strip()) > 20]
     # return requirements[:15]
-    headers = ["key responsibilities", "required skills", "qualifications", "preferred"]
     
-    for l in lines:
-        clean_l = l.strip()
-        # Only keep lines that aren't just headers and are long enough to be real requirements
-        if len(clean_l) > 25 and not any(h in clean_l.lower() for h in headers):
-            requirements.append(clean_l)
+    # for l in lines:
+    #     clean_l = l.strip()
+    #     # Only keep lines that aren't just headers and are long enough to be real requirements
+    #     if len(clean_l) > 25 and not any(h in clean_l.lower() for h in headers):
+    #         requirements.append(clean_l)
             
-    return requirements[:15]
+    # return requirements[:15]
 
 
 def analyze_skills(jd_text, resume_text):
