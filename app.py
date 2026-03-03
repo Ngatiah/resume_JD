@@ -28,7 +28,7 @@ def extract_text(file):
 def chunk_resume(resume_text):
     """Simple cleaner to extract meaningful chunks for comparison"""
     # Removes special chars and splits by commas/bullets/newlines
-    chunks = re.split(r'[,.\n•●/-]', text)
+    chunks = re.split(r'[,.\n•●/-]', resume_text)
     return [c.strip() for c in chunks if len(c.strip()) > 3]
 
 def extract_jd(jd_text):
