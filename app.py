@@ -226,33 +226,33 @@ if st.button("🚀 Analyze & Rank"):
                 # 2. Skill-Level Audit (Using our optimized batch function)
                 matches, gaps = analyze_skills(jd_input, text)
 
-                total_reqs = len(matches) + len(gaps)
-                # Avoid division by zero and cap denominator to normalize across different JD lengths
-                norm_denom = max(total_reqs, 5) 
-                coverage_ratio = len(matches) / norm_denom
-
-                # Final Weighted Score
-                # 40% based on general semantic context
-                # 60% based on specific requirement coverage
-                final_score = ((raw_sim * 0.4) + (min(coverage_ratio, 1.0) * 0.6)) * 100
-
-                # Optional: Semantic "Floor" - if they don't hit at least 1 match, 
-                # keep the score very low regardless of raw similarity.
-                if len(matches) == 0:
-                    final_score = min(final_score, 30.0)
-
                 # total_reqs = len(matches) + len(gaps)
-                # if total_reqs > 0:
-                #     coverage_ratio = np.sqrt(len(matches) / max(len(matches) + len(gaps), 1))
-                # else:
-                #     coverage_ratio = 0
+                # # Avoid division by zero and cap denominator to normalize across different JD lengths
+                # norm_denom = max(total_reqs, 5) 
+                # coverage_ratio = len(matches) / norm_denom
 
-                # final_score = (
-                #     (raw_sim * 0.4) +
-                #     (coverage_ratio * 0.6)
-                # ) * 100
+                # # Final Weighted Score
+                # # 40% based on general semantic context
+                # # 60% based on specific requirement coverage
+                # final_score = ((raw_sim * 0.4) + (min(coverage_ratio, 1.0) * 0.6)) * 100
 
-                # final_score = round(final_score, 2)
+                # # Optional: Semantic "Floor" - if they don't hit at least 1 match, 
+                # # keep the score very low regardless of raw similarity.
+                # if len(matches) == 0:
+                #     final_score = min(final_score, 30.0)
+
+                total_reqs = len(matches) + len(gaps)
+                if total_reqs > 0:
+                    coverage_ratio = np.sqrt(len(matches) / max(len(matches) + len(gaps), 1))
+                else:
+                    coverage_ratio = 0
+
+                final_score = (
+                    (raw_sim * 0.4) +
+                    (coverage_ratio * 0.6)
+                ) * 100
+
+                final_score = round(final_score, 2)
 
                 results.append({
                     "Candidate": file.name,
