@@ -209,7 +209,12 @@ if st.button("🚀 Analyze & Rank"):
                 matches, gaps = analyze_skills(jd_input, text)
                 
                 # coverage_ratio = len(matches) / max(len(matches) + len(gaps), 1)
-                coverage_ratio = np.sqrt(len(matches) / max(len(matches) + len(gaps), 1))
+                # coverage_ratio = np.sqrt(len(matches) / max(len(matches) + len(gaps), 1))
+                total_reqs = len(matches) + len(gaps)
+                if total_reqs > 0:
+                    coverage_ratio = np.sqrt(len(matches) / max(len(matches) + len(gaps), 1))
+                else:
+                    coverage_ratio = 0
 
                 final_score = (
                     (raw_sim * 0.4) +
