@@ -337,9 +337,14 @@ if st.button("🚀 Analyze & Rank"):
                 if row['Full_Matches']:
                     st.write("---")
                     st.write("**Match Confidence Profile**")
+
+                    requirements = [m[0] for m in row['Full_Matches']]
+                    confidences = [m[1] for m in row['Full_Matches']]
                     # Simulating confidence levels for the UI
                     conf_data = pd.DataFrame({
-                        "Requirement": row['Full_Matches'],
-                        "Confidence": np.random.uniform(75, 99, len(row['Full_Matches']))
+                        # "Requirement": row['Full_Matches'],
+                        "Requirement": requirements,
+                        # "Confidence": np.random.uniform(75, 99, len(row['Full_Matches']))
+                        "Confidence": confidences
                     }).set_index("Requirement")
                     st.bar_chart(conf_data)
