@@ -124,7 +124,8 @@ def analyze_skills(jd_text, resume_text):
         skill_name = jd_requirements[i]
         # if score.item() > 0.65: # .item() converts tensor to float
         if score.item() > 0.72: # .item() converts tensor to float
-            matched.append(skill_name)
+            # matched.append(skill_name)
+            matched.append((skill_name, round(score.item()*100,2)))
         else:
             gaps.append(skill_name)
             
