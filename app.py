@@ -128,8 +128,17 @@ def extract_jd(jd_text):
     # #     requirements = [s.strip() for s in sentences if 30 < len(s.strip()) < 200][:10]
 
     # return requirements[:20]
-    lines = relevant_text.split("\n")
-    requirements = [l.strip() for l in lines if len(l.strip()) > 20]
+    # lines = relevant_text.split("\n")
+    # requirements = [l.strip() for l in lines if len(l.strip()) > 20]
+    # return requirements[:15]
+    headers = ["key responsibilities", "required skills", "qualifications", "preferred"]
+    
+    for l in lines:
+        clean_l = l.strip()
+        # Only keep lines that aren't just headers and are long enough to be real requirements
+        if len(clean_l) > 25 and not any(h in clean_l.lower() for h in headers):
+            requirements.append(clean_l)
+            
     return requirements[:15]
 
 
@@ -264,13 +273,22 @@ if st.button("🚀 Analyze & Rank"):
                 res_emb = model.encode(text, convert_to_tensor=True)
                 raw_sim = util.cos_sim(jd_emb, res_emb).item()
                 
-                # Calibrated Score
-                calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
-                # final_score = sigmoid_calibration(calibrated) * 100
-                final_score = float(np.clip(calibrated * 10, 0, 100)) 
 
                 # 2. Skill-Level Audit (Using our optimized batch function)
                 matches, gaps = analyze_skills(jd_input, text)
+                
+                # Calibrated Score
+                # calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
+                # # final_score = sigmoid_calibration(calibrated) * 100
+                # final_score = float(np.clip(calibrated * 10, 0, 100)) 
+
+                total_reqs = len(matches) + len(gaps)
+                coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
+
+                # 3. Final Differentiated Score (40% Vibe, 60% Coverage)
+                # This prevents the 100% ceiling and rewards specific skill matches
+                final_score = ((raw_sim * 0.4) + (coverage_ratio * 0.6)) * 100
+                final_score = round(final_score, 2)
 
                 results.append({
                     "Candidate": file.name,
