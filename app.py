@@ -97,9 +97,9 @@ def extract_jd(jd_text):
 
     # 2. Fallback: If no headers, take the whole text but skip "About" intro
     if start_idx == None:
-        return []
-    
-    relevant_text = jd_clean[start_idx:]
+        relevant_text = jd_clean
+    else:
+        relevant_text = jd_clean[start_idx:]
 
     # 3. Smart Filtering of lines
     lines = relevant_text.split("\n")
@@ -229,10 +229,10 @@ def generate_pdf_report(df):
 
 import math
 
-def sigmoid_calibration(score):
-    # This keeps the score mapping 1:1 in the middle but 
-    # prevents it from exploding at the top/bottom
-    return 1 / (1 + math.exp(-score))
+# def sigmoid_calibration(score):
+#     # This keeps the score mapping 1:1 in the middle but 
+#     # prevents it from exploding at the top/bottom
+#     return 1 / (1 + math.exp(-score))
 
 
 # --- UI LAYOUT ---
@@ -262,7 +262,8 @@ if st.button("🚀 Analyze & Rank"):
                 
                 # Calibrated Score
                 calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
-                final_score = sigmoid_calibration(calibrated) * 100
+                # final_score = sigmoid_calibration(calibrated) * 100
+                final_score = float(np.clip(calibrated * 10, 0, 100)) 
 
                 # 2. Skill-Level Audit (Using our optimized batch function)
                 matches, gaps = analyze_skills(jd_input, text)
