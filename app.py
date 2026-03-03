@@ -86,15 +86,15 @@ def extract_jd(jd_text):
 
     return requirements[:20]
 
-st.header("Step 3: Matching Strictness")
-strictness = st.slider(
-    "Similarity Threshold", 
-    min_value=0.60, 
-    max_value=0.90, 
-    value=0.72, 
-    step=0.01,
-    help="Higher = more strict. Lower = finds more synonyms."
-)
+# st.header("Step 3: Matching Strictness")
+# strictness = st.slider(
+#     "Similarity Threshold", 
+#     min_value=0.60, 
+#     max_value=0.90, 
+#     value=0.72, 
+#     step=0.01,
+#     help="Higher = more strict. Lower = finds more synonyms."
+# )
 
 def analyze_skills(jd_text, resume_text):
     """Matches JD requirements to Resume text using SBERT"""
@@ -118,9 +118,9 @@ def analyze_skills(jd_text, resume_text):
 
     for i, score in enumerate(max_scores):
         skill_name = jd_requirements[i]
-        # if score.item() > 0.65: # .item() converts tensor to float
+        if score.item() > 0.65: # .item() converts tensor to float
         # if score.item() > 0.72: # .item() converts tensor to float
-        if score.item() > strictness: # .item() converts tensor to float
+        # if score.item() > strictness: # .item() converts tensor to float
             # matched.append(skill_name)
             matched.append((skill_name, round(score.item()*100,2)))
         else:
