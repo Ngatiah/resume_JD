@@ -106,27 +106,30 @@ def extract_jd(jd_text):
     requirements = []
     
     # List of "Noise" phrases to discard
-    stop_phrases = ["about the company", "equal opportunity", "how to apply", "salary range", "rate:", "engagement", "title:"]
+    # stop_phrases = ["about the company", "equal opportunity", "how to apply", "salary range", "rate:", "engagement", "title:"]
 
-    for line in lines:
-        line = line.strip()
-        # Filter for quality: not too short, not a header, not noise
-        if (
-            # 15 < len(line) < 300  # Requirements are usually sentences
-            len(line) >  25  # Requirements are usually sentences
-            and not any(stop in line for stop in stop_phrases)
-            and (line.startswith(('-', '•', '*', '○', '●')) or any(char.isdigit() for char in line[:2]))
-        ):
-            # Clean bullet points for better SBERT encoding
-            cleaned_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', line)
-            requirements.append(cleaned_line)
+    # for line in lines:
+    #     line = line.strip()
+    #     # Filter for quality: not too short, not a header, not noise
+    #     if (
+    #         # 15 < len(line) < 300  # Requirements are usually sentences
+    #         len(line) >  25  # Requirements are usually sentences
+    #         and not any(stop in line for stop in stop_phrases)
+    #         and (line.startswith(('-', '•', '*', '○', '●')) or any(char.isdigit() for char in line[:2]))
+    #     ):
+    #         # Clean bullet points for better SBERT encoding
+    #         cleaned_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', line)
+    #         requirements.append(cleaned_line)
 
-    # 4. Final Fallback: If no bullet points found, take the top 10 meaningful sentences
-    # if not requirements:
-    #     sentences = re.split(r'(?<=[.!?]) +', relevant_text)
-    #     requirements = [s.strip() for s in sentences if 30 < len(s.strip()) < 200][:10]
+    # # 4. Final Fallback: If no bullet points found, take the top 10 meaningful sentences
+    # # if not requirements:
+    # #     sentences = re.split(r'(?<=[.!?]) +', relevant_text)
+    # #     requirements = [s.strip() for s in sentences if 30 < len(s.strip()) < 200][:10]
 
-    return requirements[:20]
+    # return requirements[:20]
+    lines = relevant_text.split("\n")
+    requirements = [l.strip() for l in lines if len(l.strip()) > 20]
+    return requirements[:15]
 
 
 def analyze_skills(jd_text, resume_text):
