@@ -302,20 +302,21 @@ def generate_pdf_report(df):
         elements.append(Spacer(1, 8))
 
         # Gaps
-        elements.append(Paragraph("<b>Identified Gaps:</b>", styles['Normal']))
+        elements.append(Paragraph("<b>🔍 Gap Analysis by Category:</b>", styles['Normal']))
         elements.append(Spacer(1, 4))
 
-        if row["Full_Gaps"]:
-            for g in row["Full_Gaps"]:
-                if isinstance(g, tuple):
-                    # elements.append(Paragraph(f"• {g}", styles['Normal']))
-                    elements.append(Paragraph(
-                                f"• {g[0]}  (Confidence: {g[1]}%)",
-                                styles['Normal']
-                            ))
-                else:
-                            elements.append(Paragraph(f"• {g}", styles['Normal']))
-        else:
+        found_any_gap = False
+        # Here is the fix for the AttributeError: iterating through the dictionary
+        for category, gap_list in row["Full_Gaps"].items():
+            if gap_list:
+                found_any_gap = True
+                # Add category sub-header
+                elements.append(Paragraph(f"<i>{category}:</i>", styles['Normal']))
+                for g in gap_list:
+                    elements.append(Paragraph(f"• {g}", styles['Normal']))
+                elements.append(Spacer(1, 4))
+
+        if not found_any_gap:
             elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
 
         elements.append(Spacer(1, 20))
