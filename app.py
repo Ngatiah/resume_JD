@@ -25,11 +25,57 @@ def extract_text(file):
     pdf = PyPDF2.PdfReader(file)
     return " ".join([page.extract_text() or "" for page in pdf.pages])
 
-def get_keywords(text):
-    """Simple cleaner to extract meaningful chunks for comparison"""
-    # Removes special chars and splits by commas/bullets/newlines
-    chunks = re.split(r'[,.\n•●/-]', text)
-    return [c.strip() for c in chunks if len(c.strip()) > 3]
+# def get_keywords(text):
+#     """Simple cleaner to extract meaningful chunks for comparison"""
+#     # Removes special chars and splits by commas/bullets/newlines
+#     chunks = re.split(r'[,.\n•●/-]', text)
+#     return [c.strip() for c in chunks if len(c.strip()) > 3]
+
+def get_keywords(jd_text):
+    """
+    Extract meaningful skill/responsibility requirements 
+    from JD using structured section parsing.
+    """
+
+    # Normalize whitespace
+    jd_text = re.sub(r'\r', '', jd_text)
+
+    # Capture content under relevant sections using regex blocks
+    pattern = re.compile(
+        r'(Key Responsibilities|Responsibilities|Required Skills.*?|Qualifications|Preferred Qualifications)(.*?)(?=\n[A-Z][^\n]+\n|$)',
+        re.IGNORECASE | re.DOTALL
+    )
+
+    matches = pattern.findall(jd_text)
+
+    extracted = []
+
+    for _, section_text in matches:
+        # Split by bullet symbols or line breaks (NOT hyphen)
+        chunks = re.split(r'\n|•|●', section_text)
+
+        for chunk in chunks:
+            chunk = chunk.strip()
+
+            # Remove leading dashes only (not internal ones)
+            chunk = re.sub(r'^-\s*', '', chunk)
+
+            # Filter noise
+            if len(chunk) > 20 and not chunk.lower().startswith(
+                ("about", "title", "rate", "engagement", "job summary")
+            ):
+                extracted.append(chunk)
+
+    # Remove near-duplicates while preserving order
+    seen = set()
+    cleaned = []
+    for item in extracted:
+        norm = item.lower()
+        if norm not in seen:
+            seen.add(norm)
+            cleaned.append(item)
+
+    return cleaned[:15]
 
 # def analyze_skills(jd_text, resume_text):
 #     """Matches JD requirements to Resume text using SBERT"""
