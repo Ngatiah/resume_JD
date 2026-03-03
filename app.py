@@ -216,18 +216,39 @@ def analyze_skills(jd_text, resume_text):
     # Now find the max score for each JD requirement
     max_scores, _ = torch.max(cosine_scores, dim=1)
 
+    # matched = []
+    # gaps = []
+
     matched = []
-    gaps = []
+    gaps = {
+        "Technical/AI": [],
+        "Domain Expertise": [],
+        "Soft Skills/Other": []
+    }
+
+    # for i, score in enumerate(max_scores):
+    #     skill_name = jd_requirements[i]
+    #     if score.item() > 0.65: # .item() converts tensor to float
+    #     # if score.item() > 0.72: # .item() converts tensor to float
+    #     # if score.item() > strictness: # .item() converts tensor to float
+    #         # matched.append(skill_name)
+    #         matched.append((skill_name, round(score.item()*100,2)))
+    #     else:
+    #         gaps.append(skill_name)
 
     for i, score in enumerate(max_scores):
         skill_name = jd_requirements[i]
-        if score.item() > 0.65: # .item() converts tensor to float
-        # if score.item() > 0.72: # .item() converts tensor to float
-        # if score.item() > strictness: # .item() converts tensor to float
-            # matched.append(skill_name)
-            matched.append((skill_name, round(score.item()*100,2)))
+        if score.item() > 0.65:
+            matched.append((skill_name, round(score.item()*100, 2)))
         else:
-            gaps.append(skill_name)
+            # Categorize the Gap
+            low_skill = skill_name.lower()
+            if any(k in low_skill for k in ['ai', 'data', 'algorithm', 'software', 'dataset']):
+                gaps["Technical/AI"].append(skill_name)
+            elif any(k in low_skill for k in ['soil', 'plant', 'agronomy', 'crop', 'physiology']):
+                gaps["Domain Expertise"].append(skill_name)
+            else:
+                gaps["Soft Skills/Other"].append(skill_name)
             
     return list(set(matched)), list(set(gaps))
 
@@ -291,6 +312,22 @@ def generate_pdf_report(df):
             elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
 
         elements.append(Spacer(1, 20))
+
+        # Gaps
+        elements.append(Paragraph("<b>Gap Analysis by Category:</b>", styles['Normal']))
+        elements.append(Spacer(1, 4))
+
+        has_gaps = False
+        for category, gap_list in row["Full_Gaps"].items():
+            if gap_list:
+                has_gaps = True
+                elements.append(Paragraph(f"<i>{category}:</i>", styles['Normal']))
+                for g in gap_list:
+                    elements.append(Paragraph(f"• {g}", styles['Normal']))
+                elements.append(Spacer(1, 4))
+
+        if not has_gaps:
+            elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
 
     doc.build(elements)
     buffer.seek(0)
