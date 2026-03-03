@@ -208,7 +208,9 @@ if st.button("🚀 Analyze & Rank"):
                 # 2. Skill-Level Audit (Using our optimized batch function)
                 matches, gaps = analyze_skills(jd_input, text)
                 
-                coverage_ratio = len(matches) / max(len(matches) + len(gaps), 1)
+                # coverage_ratio = len(matches) / max(len(matches) + len(gaps), 1)
+                coverage_ratio = np.sqrt(len(matches) / max(len(matches) + len(gaps), 1))
+
                 final_score = (
                     (raw_sim * 0.4) +
                     (coverage_ratio * 0.6)
