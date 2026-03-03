@@ -31,50 +31,92 @@ def chunk_resume(resume_text):
     chunks = re.split(r'[,.\n•●/-]', resume_text)
     return [c.strip() for c in chunks if len(c.strip()) > 3]
 
+# def extract_jd(jd_text):
+#     """
+#     Extract meaningful skill/responsibility requirements 
+#     from JD using structured section parsing.
+#     """
+#     # Normalize whitespace
+#     jd_text = re.sub(r'\r', '', jd_text)
+
+#     # Capture content under relevant sections using regex blocks
+#     pattern = re.compile(
+#         r'(Key Responsibilities|Responsibilities|Required Skills.*?|Qualifications|Preferred Qualifications)(.*?)(?=\n[A-Z][^\n]+\n|$)',
+#         re.IGNORECASE | re.DOTALL
+#     )
+
+#     matches = pattern.findall(jd_text)
+
+#     extracted = []
+
+#     for _, section_text in matches:
+#         # Split by bullet symbols or line breaks (NOT hyphen)
+#         chunks = re.split(r'\n|•|●', section_text)
+
+#         for chunk in chunks:
+#             chunk = chunk.strip()
+
+#             # Remove leading dashes only (not internal ones)
+#             chunk = re.sub(r'^-\s*', '', chunk)
+
+#             # Filter noise
+#             if len(chunk) > 20 and not chunk.lower().startswith(
+#                 ("about", "title", "rate", "engagement", "job summary")
+#             ):
+#                 extracted.append(chunk)
+
+#     # Remove near-duplicates while preserving order
+#     seen = set()
+#     cleaned = []
+#     for item in extracted:
+#         norm = item.lower()
+#         if norm not in seen:
+#             seen.add(norm)
+#             cleaned.append(item)
+
+#     return cleaned[:15]
+
 def extract_jd(jd_text):
     """
-    Extract meaningful skill/responsibility requirements 
-    from JD using structured section parsing.
+    Robust JD extraction without fragile regex blocks.
     """
-    # Normalize whitespace
-    jd_text = re.sub(r'\r', '', jd_text)
 
-    # Capture content under relevant sections using regex blocks
-    pattern = re.compile(
-        r'(Key Responsibilities|Responsibilities|Required Skills.*?|Qualifications|Preferred Qualifications)(.*?)(?=\n[A-Z][^\n]+\n|$)',
-        re.IGNORECASE | re.DOTALL
-    )
+    jd_text = jd_text.lower()
 
-    matches = pattern.findall(jd_text)
+    # Keep only the meaningful section onward
+    trigger_words = [
+        "key responsibilities",
+        "required skills",
+        "required qualifications",
+        "preferred qualifications"
+    ]
 
-    extracted = []
+    start_idx = None
+    for word in trigger_words:
+        idx = jd_text.find(word)
+        if idx != -1:
+            start_idx = idx
+            break
 
-    for _, section_text in matches:
-        # Split by bullet symbols or line breaks (NOT hyphen)
-        chunks = re.split(r'\n|•|●', section_text)
+    if start_idx is None:
+        return []
 
-        for chunk in chunks:
-            chunk = chunk.strip()
+    relevant_text = jd_text[start_idx:]
 
-            # Remove leading dashes only (not internal ones)
-            chunk = re.sub(r'^-\s*', '', chunk)
+    # Split into lines
+    lines = relevant_text.split("\n")
 
-            # Filter noise
-            if len(chunk) > 20 and not chunk.lower().startswith(
-                ("about", "title", "rate", "engagement", "job summary")
-            ):
-                extracted.append(chunk)
+    requirements = []
+    for line in lines:
+        line = line.strip()
 
-    # Remove near-duplicates while preserving order
-    seen = set()
-    cleaned = []
-    for item in extracted:
-        norm = item.lower()
-        if norm not in seen:
-            seen.add(norm)
-            cleaned.append(item)
+        if (
+            len(line) > 25
+            and not any(x in line for x in ["about the job", "rate:", "engagement", "title:"])
+        ):
+            requirements.append(line)
 
-    return cleaned[:15]
+    return requirements[:15]
 
 
 def analyze_skills(jd_text, resume_text):
