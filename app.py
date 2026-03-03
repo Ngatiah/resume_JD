@@ -381,17 +381,17 @@ if st.button("🚀 Analyze & Rank"):
                 matches, gaps = analyze_skills(jd_input, text)
                 
                 # Calibrated Score
-                # calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
-                # # final_score = sigmoid_calibration(calibrated) * 100
-                # final_score = float(np.clip(calibrated * 10, 0, 100)) 
+                calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
+                # final_score = sigmoid_calibration(calibrated) * 100
+                final_score = float(np.clip(calibrated * 10, 0, 100)) 
 
-                total_reqs = len(matches) + len(gaps)
-                coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
+                # total_reqs = len(matches) + len(gaps)
+                # coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
 
-                # 3. Final Differentiated Score (40% Vibe, 60% Coverage)
-                # This prevents the 100% ceiling and rewards specific skill matches
-                final_score = ((raw_sim * 0.4) + (coverage_ratio * 0.6)) * 100
-                final_score = round(final_score, 2)
+                # # 3. Final Differentiated Score (40% Vibe, 60% Coverage)
+                # # This prevents the 100% ceiling and rewards specific skill matches
+                # final_score = ((raw_sim * 0.4) + (coverage_ratio * 0.6)) * 100
+                # final_score = round(final_score, 2)
 
                 results.append({
                     "Candidate": file.name,
