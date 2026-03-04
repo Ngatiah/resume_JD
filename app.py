@@ -13,15 +13,12 @@ st.set_page_config(page_title="AI Resume Job Matcher", layout="wide")
 # 2. Load Assets
 @st.cache_resource
 def load_assets():
-    model = SentenceTransformer('all-MiniLM-L6-v2')
-    # model = SentenceTransformer('all-mpnet-base-v2')
-    # scaler = joblib.load('semantic_scaler_2.pkl')
-    scaler = joblib.load('semantic_scaler.pkl')
+    # # Model now loads from Hugging Face instead of a local path
+    model = SentenceTransformer('iwamu/bert-data-analyst-matcher')
+    scaler = joblib.load('semantic_scaler_2.pkl')
     return model, scaler
-    return model
 
 model, scaler = load_assets()
-# model = load_assets()
 
 # --- HELPER FUNCTIONS ---
 def extract_text(file):
@@ -33,7 +30,6 @@ def chunk_resume(resume_text):
     # Removes special chars and splits by commas/bullets/newlines
     chunks = re.split(r'[,.\n•●/-]', resume_text)
     return [c.strip() for c in chunks if len(c.strip()) > 3]
-
 
 
 def extract_jd(jd_text):
@@ -183,7 +179,7 @@ def analyze_skills(jd_text, resume_text):
         low_skill = skill_name.lower()
         score_val = round(score.item() * 100, 2)
         
-        if score_val > 65:
+        if score_val > 70:
             matched.append((skill_name, score_val))
         else:
             if any(k in low_skill for k in tech_k):
@@ -248,21 +244,21 @@ def generate_pdf_report(df):
         elements.append(Paragraph("<b>🔍 Gap Analysis by Category:</b>", styles['Normal']))
         elements.append(Spacer(1, 4))
 
-        found_any_gap = False
+        # found_any_gap = False
         # Here is the fix for the AttributeError: iterating through the dictionary
-        for category, gap_list in row["Full_Gaps"].items():
-            if gap_list:
-                found_any_gap = True
-                # Add category sub-header
-                elements.append(Paragraph(f"<i>{category}:</i>", styles['Normal']))
-                for g in gap_list:
-                    elements.append(Paragraph(f"• {g}", styles['Normal']))
-                elements.append(Spacer(1, 4))
+        # for category, gap_list in row["Full_Gaps"].items():
+        #     if gap_list:
+        #         found_any_gap = True
+        #         # Add category sub-header
+        #         elements.append(Paragraph(f"<i>{category}:</i>", styles['Normal']))
+        #         for g in gap_list:
+        #             elements.append(Paragraph(f"• {g}", styles['Normal']))
+        #         elements.append(Spacer(1, 4))
 
-        if not found_any_gap:
-            elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
+        # if not found_any_gap:
+        #     elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
 
-        elements.append(Spacer(1, 20))
+        # elements.append(Spacer(1, 20))
 
         # Gaps
         elements.append(Paragraph("<b>Gap Analysis by Category:</b>", styles['Normal']))
@@ -323,9 +319,9 @@ if st.button("🚀 Analyze & Rank"):
                 matches, gaps = analyze_skills(jd_input, text)
                 
                 # Calibrated Score
-                calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
-                # final_score = sigmoid_calibration(calibrated) * 100
-                final_score = float(np.clip(calibrated * 10, 0, 100)) 
+                # calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
+                # # final_score = sigmoid_calibration(calibrated) * 100
+                # final_score = float(np.clip(calibrated * 10, 0, 100)) 
 
                 # total_reqs = len(matches) + len(gaps)
                 # coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
@@ -334,6 +330,18 @@ if st.button("🚀 Analyze & Rank"):
                 # # This prevents the 100% ceiling and rewards specific skill matches
                 # final_score = ((raw_sim * 0.4) + (coverage_ratio * 0.6)) * 100
                 # final_score = round(final_score, 2)
+
+                # 3. Hybrid Scoring Logic
+                # Calculate coverage based on your new 70 threshold
+                total_reqs = len(matches) + sum(len(v) for v in gaps.values())
+                coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
+
+                # Scale the raw similarity (Global Vibe)
+                calibrated_vibe = scaler.transform(np.array([[raw_sim]]))[0][0] * 10 
+
+                # Final Score: 40% Global Vibe, 60% Skill Match Coverage
+                final_score = (calibrated_vibe * 0.4) + (coverage_ratio * 100 * 0.6)
+                final_score = float(np.clip(final_score, 0, 100))
 
                 results.append({
                     "Candidate": file.name,
