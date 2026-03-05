@@ -35,7 +35,7 @@ def chunk_resume(resume_text):
 
 def extract_jd(jd_text):
     jd_clean = jd_text.lower()
-    trigger_words = ["education and experience", "technical skills", "requirements", "responsibilities", "duties"]
+    trigger_words = ["education and experience", "technical skills", "requirements", "responsibilities"]
 
     start_idx = 0
     for word in trigger_words:
@@ -48,21 +48,19 @@ def extract_jd(jd_text):
     lines = relevant_text.split("\n")
     
     requirements = []
+    # Add triggers to a set for fast lookup
+    blacklisted_headers = set(trigger_words)
+    
     for l in lines:
         clean_l = l.strip()
-        # LOWER THE LIMIT: Technical skills like "SQL" or "Python" are short!
-        if len(clean_l) < 5:
-            continue
-            
-        # Remove colons only if they are at the very end (headers)
-        if clean_l.endswith(':'):
+        if len(clean_l) < 5 or clean_l in blacklisted_headers or clean_l.endswith(':'):
             continue
 
-        # Clean leading bullet points
         final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
-        requirements.append(final_line)
+        if len(final_line) > 10: # Ensure we aren't matching on single words
+            requirements.append(final_line)
             
-    return requirements[:25]
+    return requirements[:20]
 
 
 def analyze_skills(jd_text, resume_text):
@@ -85,9 +83,12 @@ def analyze_skills(jd_text, resume_text):
         skill_name = jd_requirements[i]
         score_val = score.item() * 100
         
-        if score_val > 60:
+        if score_val > 60: # Strong match
             matched.append((skill_name, round(score_val, 2)))
             total_quality_score += 1.0 
+        elif score_val > 45: # Partial Match
+            matched.append((skill_name + " (Partial)", round(score_val, 2)))
+            total_quality_score += 0.5
         else:
             # Smart Categorization for Gaps
             low_s = skill_name.lower()
@@ -164,26 +165,6 @@ def generate_pdf_report(df):
         elements.append(Paragraph("<b>🔍 Gap Analysis by Category:</b>", styles['Normal']))
         elements.append(Spacer(1, 4))
 
-        # found_any_gap = False
-        # Here is the fix for the AttributeError: iterating through the dictionary
-        # for category, gap_list in row["Full_Gaps"].items():
-        #     if gap_list:
-        #         found_any_gap = True
-        #         # Add category sub-header
-        #         elements.append(Paragraph(f"<i>{category}:</i>", styles['Normal']))
-        #         for g in gap_list:
-        #             elements.append(Paragraph(f"• {g}", styles['Normal']))
-        #         elements.append(Spacer(1, 4))
-
-        # if not found_any_gap:
-        #     elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
-
-        # elements.append(Spacer(1, 20))
-
-        # Gaps
-        # elements.append(Paragraph("<b>Gap Analysis by Category:</b>", styles['Normal']))
-        # elements.append(Spacer(1, 4))
-
         has_gaps = False
         for category, gap_list in row["Full_Gaps"].items():
             if gap_list:
@@ -200,13 +181,6 @@ def generate_pdf_report(df):
     buffer.seek(0)
     return buffer
 
-
-import math
-
-# def sigmoid_calibration(score):
-#     # This keeps the score mapping 1:1 in the middle but 
-#     # prevents it from exploding at the top/bottom
-#     return 1 / (1 + math.exp(-score))
 
 
 # --- UI LAYOUT ---
