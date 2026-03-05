@@ -198,7 +198,7 @@ def analyze_skills(jd_text, resume_text):
     resume_chunks = chunk_resume(resume_text)
     
     if not jd_requirements or not resume_chunks:
-        return [], {"Technical": [], "Domain": [], "Soft Skills": []}
+        return [], {"Technical": [], "Domain": [], "Soft Skills": []}, 0.0
     
     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
@@ -311,8 +311,8 @@ def generate_pdf_report(df):
         # elements.append(Spacer(1, 20))
 
         # Gaps
-        elements.append(Paragraph("<b>Gap Analysis by Category:</b>", styles['Normal']))
-        elements.append(Spacer(1, 4))
+        # elements.append(Paragraph("<b>Gap Analysis by Category:</b>", styles['Normal']))
+        # elements.append(Spacer(1, 4))
 
         has_gaps = False
         for category, gap_list in row["Full_Gaps"].items():
