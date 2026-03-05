@@ -83,7 +83,8 @@ def extract_jd(jd_text):
     # Find section starts more robustly
     section_keywords = [
         "responsibilities", "requirements", "qualifications", 
-        "skills", "experience", "what we look for"
+        "skills", "experience", "what we look for", "required qualifications",
+        "preferred qualifications", "key responsibilities", "what we offer"
     ]
     
     # Extract from first section keyword onward
