@@ -7,7 +7,10 @@ import joblib
 import re
 import torch
 import pytesseract
-from pdf2image import convert_from_bytes
+import fitz
+from PIL import Image
+import io
+# from pdf2image import convert_from_bytes
 
 # 1. Page Configuration
 st.set_page_config(page_title="AI Resume Job Matcher", layout="wide")
@@ -28,6 +31,25 @@ model, scaler = load_assets()
 #     return " ".join([page.extract_text() or "" for page in pdf.pages])
 
 # extract image pdf, scanned and exported resumes
+# def extract_text(file):
+#     try:
+#         pdf = PyPDF2.PdfReader(file)
+#         text = " ".join([page.extract_text() or "" for page in pdf.pages])
+        
+#         if len(text.strip()) > 50:
+#             return text
+#     except:
+#         pass
+
+#     # OCR fallback
+#     images = convert_from_bytes(file.read())
+#     ocr_text = ""
+
+#     for img in images:
+#         ocr_text += pytesseract.image_to_string(img)
+
+#     return ocr_text
+
 def extract_text(file):
     try:
         pdf = PyPDF2.PdfReader(file)
@@ -39,10 +61,16 @@ def extract_text(file):
         pass
 
     # OCR fallback
-    images = convert_from_bytes(file.read())
+    file.seek(0)
+    pdf = fitz.open(stream=file.read(), filetype="pdf")
+
     ocr_text = ""
 
-    for img in images:
+    for page in pdf:
+        pix = page.get_pixmap()
+        img_bytes = pix.tobytes("png")
+        img = Image.open(io.BytesIO(img_bytes))
+
         ocr_text += pytesseract.image_to_string(img)
 
     return ocr_text
