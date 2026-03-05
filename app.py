@@ -43,6 +43,7 @@ def extract_jd(jd_text):
         "key responsibilities", "required skills", "qualifications", 
         "what you will do", "requirements", "core competencies", 
         "education", "experience", "education and experience",
+        "duties & responsibilities", "duties", "responsibilities", 
     ]
 
     start_idx = 0
@@ -58,9 +59,9 @@ def extract_jd(jd_text):
     # 2. Aggressive Header Blacklist
     # These words represent section titles, not actual requirements.
     header_blacklist = [
-        "responsibilities", "skills", "qualifications", "requirements", 
+        "responsibilities", "skills", "qualifications", "requirements", "key responsibilities",
         "preferred", "about the job", "job summary", "education and experience",
-        "education", "experience"
+        "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
     ]
     
     requirements = []
