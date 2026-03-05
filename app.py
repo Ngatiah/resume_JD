@@ -142,54 +142,104 @@ def extract_jd(jd_text):
 #     # return list(set(matched)), list(set(gaps))
 #     return list(set(matched)), gaps
 
+# def analyze_skills(jd_text, resume_text):
+#     jd_requirements = extract_jd(jd_text)
+#     resume_chunks = chunk_resume(resume_text)
+    
+#     if not jd_requirements or not resume_chunks:
+#         return [], {"Technical & ML": [], "Stats & Research": [], "Background & Soft Skills": []}
+    
+#     # batch-encode for speed
+#     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
+#     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
+    
+#     # Use matrix multiplication for all scores at once
+#     cosine_scores = util.cos_sim(jd_embs, res_embs) 
+#     # Now find the max score for each JD requirement
+#     max_scores, _ = torch.max(cosine_scores, dim=1)
+
+#     matched = []
+#     gaps = {
+#         "Technical & Machine Learning": [],
+#         "Statistics & Experimental Design": [],
+#         "Background & Soft Skills": []
+#     }
+
+#     # 1. Tech/ML: Python, SQL, ML Models, Production code
+#     tech_k = ['python', 'sql', 'machine learning', 'ml', 'production', 'algorithms', 'data manipulation']
+    
+#     # 2. Stats/Research: A/B tests, Causal Inference, Probability, Experiments
+#     stats_k = ['statistics', 'statistical', 'causal', 'inference', 'a/b', 'experiment', 'probability', 'quantitative']
+    
+#     # 3. Background/Education: Degrees, Years of Exp, Communication
+#     background_k = ['degree', 'bachelor', 'master', 'phd', 'experience', 'years', 'communication', 'remote']
+
+#     for i, score in enumerate(max_scores):
+#         skill_name = jd_requirements[i]
+#         low_skill = skill_name.lower()
+#         score_val = round(score.item() * 100, 2)
+        
+#         if score_val > 70:
+#             matched.append((skill_name, score_val))
+#         else:
+#             if any(k in low_skill for k in tech_k):
+#                 gaps["Technical & Machine Learning"].append(skill_name)
+#             elif any(k in low_skill for k in stats_k):
+#                 gaps["Statistics & Experimental Design"].append(skill_name)
+#             else:
+#                 gaps["Background & Soft Skills"].append(skill_name)
+                
+#     return list(set(matched)), gaps
+
+
 def analyze_skills(jd_text, resume_text):
-    jd_requirements = extract_jd(jd_text)
+    # INCREASE LIMIT: Capture more unique tasks from the JD
+    jd_requirements = extract_jd(jd_text)[:25] 
     resume_chunks = chunk_resume(resume_text)
     
     if not jd_requirements or not resume_chunks:
-        return [], {"Technical & ML": [], "Stats & Research": [], "Background & Soft Skills": []}
+        return [], {"Technical": [], "Domain": [], "Soft Skills": []}
     
-    # batch-encode for speed
     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
     
-    # Use matrix multiplication for all scores at once
     cosine_scores = util.cos_sim(jd_embs, res_embs) 
-    # Now find the max score for each JD requirement
     max_scores, _ = torch.max(cosine_scores, dim=1)
 
     matched = []
-    gaps = {
-        "Technical & Machine Learning": [],
-        "Statistics & Experimental Design": [],
-        "Background & Soft Skills": []
-    }
-
-    # 1. Tech/ML: Python, SQL, ML Models, Production code
-    tech_k = ['python', 'sql', 'machine learning', 'ml', 'production', 'algorithms', 'data manipulation']
+    gaps = {"Technical": [], "Domain": [], "Soft Skills": []}
     
-    # 2. Stats/Research: A/B tests, Causal Inference, Probability, Experiments
-    stats_k = ['statistics', 'statistical', 'causal', 'inference', 'a/b', 'experiment', 'probability', 'quantitative']
-    
-    # 3. Background/Education: Degrees, Years of Exp, Communication
-    background_k = ['degree', 'bachelor', 'master', 'phd', 'experience', 'years', 'communication', 'remote']
+    # NEW: Fuzzy Score Accumulator
+    # Instead of just counting 'Matches', we calculate a 'Quality Score'
+    total_quality_score = 0
 
     for i, score in enumerate(max_scores):
         skill_name = jd_requirements[i]
-        low_skill = skill_name.lower()
-        score_val = round(score.item() * 100, 2)
+        score_val = score.item() * 100
         
-        if score_val > 70:
-            matched.append((skill_name, score_val))
+        # LOWER THRESHOLD & TIERED REWARDS
+        if score_val > 60: # Strong Match
+            matched.append((skill_name, round(score_val, 2)))
+            total_quality_score += 1.0 
+        elif score_val > 45: # Partial Match (Fuzzy)
+            total_quality_score += 0.5 
         else:
-            if any(k in low_skill for k in tech_k):
-                gaps["Technical & Machine Learning"].append(skill_name)
-            elif any(k in low_skill for k in stats_k):
-                gaps["Statistics & Experimental Design"].append(skill_name)
-            else:
-                gaps["Background & Soft Skills"].append(skill_name)
-                
-    return list(set(matched)), gaps
+            # Categorize Gaps (as per your existing logic)
+            gaps["Soft Skills"].append(skill_name) 
+
+    # Return the quality score to use in the final ranking
+    quality_ratio = total_quality_score / len(jd_requirements)
+    return matched, gaps, quality_ratio
+
+# regex for years of experience
+def calculate_seniority_bonus(text):
+    # Search for "X+ years", "X years of experience", etc.
+    experience_matches = re.findall(r'(\d+)\+?\s*(?:years|yrs)', text.lower())
+    if experience_matches:
+        years = max([int(x) for x in experience_matches])
+        if years >= 10: return 15  # Senior Leader Bonus
+        if years >= 3: return 10   # Met JD Requirement Bonus
+    return 0
 
 
 # 4 . Generate downloadable output format
@@ -316,7 +366,9 @@ if st.button("🚀 Analyze & Rank"):
                 
 
                 # 2. Skill-Level Audit (Using our optimized batch function)
-                matches, gaps = analyze_skills(jd_input, text)
+                # matches, gaps = analyze_skills(jd_input, text)
+                # skill audit with fuzzy logic
+                matches, gaps, quality_ratio = analyze_skills(jd_input, text)
                 
                 # Calibrated Score
                 # calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
@@ -333,14 +385,24 @@ if st.button("🚀 Analyze & Rank"):
 
                 # 3. Hybrid Scoring Logic
                 # Calculate coverage based on your new 70 threshold
-                total_reqs = len(matches) + sum(len(v) for v in gaps.values())
-                coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
+                # total_reqs = len(matches) + sum(len(v) for v in gaps.values())
+                # coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
 
-                # Scale the raw similarity (Global Vibe)
-                calibrated_vibe = scaler.transform(np.array([[raw_sim]]))[0][0] * 10 
+                # # Scale the raw similarity (Global Vibe)
+                # calibrated_vibe = scaler.transform(np.array([[raw_sim]]))[0][0] * 10 
 
-                # Final Score: 40% Global Vibe, 60% Skill Match Coverage
-                final_score = (calibrated_vibe * 0.4) + (coverage_ratio * 100 * 0.6)
+                # # Final Score: 40% Global Vibe, 60% Skill Match Coverage
+                # final_score = (calibrated_vibe * 0.4) + (coverage_ratio * 100 * 0.6)
+                # final_score = float(np.clip(final_score, 0, 100))
+
+                # 3. Seniority Detection
+                bonus = calculate_seniority_bonus(text)
+
+                # 4. Final Differentiated Formula
+                # 30% Vibe + 50% Quality Coverage + 20% Seniority/Bonus
+                final_score = (raw_sim * 30) + (quality_ratio * 50) + bonus
+
+                # Ensure it doesn't exceed 100
                 final_score = float(np.clip(final_score, 0, 100))
 
                 results.append({
