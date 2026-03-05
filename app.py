@@ -32,68 +32,16 @@ def chunk_resume(resume_text):
     return [c.strip() for c in chunks if len(c.strip()) > 3]
 
 
-# def extract_jd(jd_text):
-#     """
-#     Enhanced JD extraction with aggressive header filtering.
-#     """
-#     jd_clean = jd_text.lower()
-    
-#     # 1. Expanded Triggers
-#     trigger_words = [
-#         "key responsibilities", "required skills", "qualifications", 
-#         "what you will do", "requirements", "core competencies", 
-#         "education", "experience", "education and experience",
-#         "duties & responsibilities", "duties", "responsibilities", 
-#     ]
-
-#     start_idx = 0
-#     for word in trigger_words:
-#         idx = jd_clean.find(word)
-#         if idx != -1:
-#             start_idx = idx
-#             break
-
-#     relevant_text = jd_clean[start_idx:]
-#     lines = relevant_text.split("\n")
-    
-#     # 2. Aggressive Header Blacklist
-#     # These words represent section titles, not actual requirements.
-#     header_blacklist = [
-#         "responsibilities", "skills", "qualifications", "requirements", "key responsibilities",
-#         "preferred", "about the job", "job summary", "education and experience",
-#         "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
-#     ]
-    
-#     requirements = []
-#     for l in lines:
-#         clean_l = l.strip()
-        
-#         # Skip empty lines or very short noise
-#         if len(clean_l) < 20:
-#             continue
-            
-#         # Skip if the line contains a colon early (usually headers like 'Rate: $55')
-#         if ":" in clean_l[:20]:
-#             continue
-
-#         # Check if the line is actually just a header (e.g., "Required Skills and Qualifications")
-#         # We check if the line *is* one of the blacklist words or contains nothing but them.
-#         is_header = any(h in clean_l.lower() for h in header_blacklist) and len(clean_l.split()) < 5
-        
-#         if not is_header:
-#             # Clean leading bullet points for better SBERT matching
-#             final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
-#             requirements.append(final_line)
-            
-#     return requirements[:15]
-
 def extract_jd(jd_text):
+    """
+    Enhanced JD extraction with aggressive header filtering.
+    """
     jd_clean = jd_text.lower()
     
-    # 1. Broaden Triggers - include the exact headers from your text
+    # 1. Expanded Triggers
     trigger_words = [
-        "duties & responsibilities", "duties", "responsibilities", 
-        "key responsibilities", "requirements", "qualifications"
+        "key responsibilities", "required skills", "qualifications", 
+        "what you will do", "requirements", "core competencies", 
     ]
 
     start_idx = 0
@@ -103,31 +51,82 @@ def extract_jd(jd_text):
             start_idx = idx
             break
 
-    # If we found a trigger, we slice. If not, we take the whole text.
-    relevant_text = jd_clean[start_idx:] if start_idx != 0 else jd_clean
+    relevant_text = jd_clean[start_idx:]
     lines = relevant_text.split("\n")
+    
+    # 2. Aggressive Header Blacklist
+    # These words represent section titles, not actual requirements.
+    header_blacklist = [
+        "responsibilities", "skills", "qualifications", "requirements", "key responsibilities",
+        "preferred", "about the job", "job summary", "education and experience",
+        # "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
+        "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
+    ]
     
     requirements = []
     for l in lines:
         clean_l = l.strip()
         
-        # LOWER THE CHARACTER LIMIT: Some JD points are short (e.g. "Draft press releases")
-        # 20 characters is often too long for a bullet point.
-        if len(clean_l) < 5: 
+        # Skip empty lines or very short noise
+        if len(clean_l) < 20:
             continue
             
-        # LOOSEN THE HEADER FILTER: Only skip if it's EXACTLY the header
-        header_blacklist = ["duties & responsibilities", "responsibilities", "requirements"]
-        if clean_l in header_blacklist:
+        # Skip if the line contains a colon early (usually headers like 'Rate: $55')
+        if ":" in clean_l[:20]:
             continue
 
-        # Clean leading bullet points
-        final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
-        if len(final_line) > 5:
+        # Check if the line is actually just a header (e.g., "Required Skills and Qualifications")
+        # We check if the line *is* one of the blacklist words or contains nothing but them.
+        is_header = any(h in clean_l.lower() for h in header_blacklist) and len(clean_l.split()) < 5
+        
+        if not is_header:
+            # Clean leading bullet points for better SBERT matching
+            final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
             requirements.append(final_line)
             
-    # INCREASE RETURN LIMIT: Capture more detail to differentiate candidates
     return requirements[:25]
+
+# def extract_jd(jd_text):
+#     jd_clean = jd_text.lower()
+    
+#     # 1. Broaden Triggers - include the exact headers from your text
+#     trigger_words = [
+#         "duties & responsibilities", "duties", "responsibilities", 
+#         "key responsibilities", "requirements", "qualifications"
+#     ]
+
+#     start_idx = 0
+#     for word in trigger_words:
+#         idx = jd_clean.find(word)
+#         if idx != -1:
+#             start_idx = idx
+#             break
+
+#     # If we found a trigger, we slice. If not, we take the whole text.
+#     relevant_text = jd_clean[start_idx:] if start_idx != 0 else jd_clean
+#     lines = relevant_text.split("\n")
+    
+#     requirements = []
+#     for l in lines:
+#         clean_l = l.strip()
+        
+#         # LOWER THE CHARACTER LIMIT: Some JD points are short (e.g. "Draft press releases")
+#         # 20 characters is often too long for a bullet point.
+#         if len(clean_l) < 5: 
+#             continue
+            
+#         # LOOSEN THE HEADER FILTER: Only skip if it's EXACTLY the header
+#         header_blacklist = ["duties & responsibilities", "responsibilities", "requirements"]
+#         if clean_l in header_blacklist:
+#             continue
+
+#         # Clean leading bullet points
+#         final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+#         if len(final_line) > 5:
+#             requirements.append(final_line)
+            
+#     # INCREASE RETURN LIMIT: Capture more detail to differentiate candidates
+#     return requirements[:25]
 
 
 # def analyze_skills(jd_text, resume_text):
