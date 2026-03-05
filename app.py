@@ -271,14 +271,16 @@ if st.button("🚀 Analyze & Rank"):
 
                 # 3. Seniority Detection
                 bonus = calculate_seniority_bonus(text)
-
+                quality_bonus = quality_ratio * 70
+                sim_bonus = raw_sim * 20
                 # 4. Final Differentiated Formula
                 # 30% Vibe + 50% Quality Coverage + 20% Seniority/Bonus
                 # final_score = (raw_sim * 30) + (quality_ratio * 50) + bonus
-                final_score = (raw_sim * 20) + (quality_ratio * 60) + bonus
-                
+                # final_score = (raw_sim * 20) + (quality_ratio * 60) + bonus
+                final_score = quality_bonus + sim_bonus + bonus
+
                 # Ensure it doesn't exceed 100
-                final_score = float(np.clip(final_score, 0, 100))
+                # final_score = float(np.clip(final_score, 0, 100))
 
                 results.append({
                     "Candidate": file.name,
