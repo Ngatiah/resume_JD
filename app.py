@@ -6,6 +6,8 @@ import PyPDF2
 import joblib
 import re
 import torch
+import pytesseract
+from pdf2image import convert_from_bytes
 
 # 1. Page Configuration
 st.set_page_config(page_title="AI Resume Job Matcher", layout="wide")
@@ -21,9 +23,30 @@ def load_assets():
 model, scaler = load_assets()
 
 # --- HELPER FUNCTIONS ---
+# def extract_text(file):
+#     pdf = PyPDF2.PdfReader(file)
+#     return " ".join([page.extract_text() or "" for page in pdf.pages])
+
+# extract image pdf, scanned and exported resumes
 def extract_text(file):
-    pdf = PyPDF2.PdfReader(file)
-    return " ".join([page.extract_text() or "" for page in pdf.pages])
+    try:
+        pdf = PyPDF2.PdfReader(file)
+        text = " ".join([page.extract_text() or "" for page in pdf.pages])
+        
+        if len(text.strip()) > 50:
+            return text
+    except:
+        pass
+
+    # OCR fallback
+    images = convert_from_bytes(file.read())
+    ocr_text = ""
+
+    for img in images:
+        ocr_text += pytesseract.image_to_string(img)
+
+    return ocr_text
+
 
 def chunk_resume(resume_text):
     """Simple cleaner to extract meaningful chunks for comparison"""
@@ -35,7 +58,16 @@ def chunk_resume(resume_text):
 
 def extract_jd(jd_text):
     jd_clean = jd_text.lower()
-    trigger_words = ["education and experience", "technical skills", "requirements", "responsibilities"]
+    # trigger_words = ["education and experience", "technical skills", "requirements", "responsibilities"]
+    trigger_words = [
+        "responsibilities",
+        "requirements",
+        "qualifications",
+        "skills",
+        "experience",
+        "job responsibilities",
+        "job requirements"
+        ]
 
     start_idx = 0
     for word in trigger_words:
@@ -200,11 +232,12 @@ if st.button("🚀 Analyze & Rank"):
     else:
         results = []
         with st.spinner("Performing Deep Semantic Audit..."):
+            #  place outside for performance since within loop recomputes it for every resune
+            jd_emb = model.encode(jd_input, convert_to_tensor=True)
             for file in uploaded_files:
                 text = extract_text(file)
                 
                 # 1. Global Similarity
-                jd_emb = model.encode(jd_input, convert_to_tensor=True)
                 res_emb = model.encode(text, convert_to_tensor=True)
                 raw_sim = util.cos_sim(jd_emb, res_emb).item()
                 
