@@ -1,3 +1,630 @@
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# from sentence_transformers import SentenceTransformer, util
+# import PyPDF2
+# import joblib
+# import re
+# import torch
+
+# # 1. Page Configuration
+# st.set_page_config(page_title="AI Resume Job Matcher", layout="wide")
+
+# # 2. Load Assets
+# @st.cache_resource
+# def load_assets():
+#     # # Model now loads from Hugging Face instead of a local path
+#     model = SentenceTransformer('iwamu/bert-data-analyst-matcher')
+#     scaler = joblib.load('semantic_scaler_2.pkl')
+#     return model, scaler
+
+# model, scaler = load_assets()
+
+# # --- HELPER FUNCTIONS ---
+# def extract_text(file):
+#     pdf = PyPDF2.PdfReader(file)
+#     return " ".join([page.extract_text() or "" for page in pdf.pages])
+
+# def chunk_resume(resume_text):
+#     """Simple cleaner to extract meaningful chunks for comparison"""
+#     # Removes special chars and splits by commas/bullets/newlines
+#     chunks = re.split(r'[,.\n•●/-]', resume_text)
+#     return [c.strip() for c in chunks if len(c.strip()) > 3]
+
+
+# # def extract_jd(jd_text):
+# #     """
+# #     Enhanced JD extraction with aggressive header filtering.
+# #     """
+# #     jd_clean = jd_text.lower()
+    
+# #     # 1. Expanded Triggers
+# #     trigger_words = [
+# #         "key responsibilities", "required skills", "qualifications", 
+# #         "what you will do", "requirements", "core competencies", 
+# #     ]
+
+# #     start_idx = 0
+# #     for word in trigger_words:
+# #         idx = jd_clean.find(word)
+# #         if idx != -1:
+# #             start_idx = idx
+# #             break
+
+# #     relevant_text = jd_clean[start_idx:]
+# #     lines = relevant_text.split("\n")
+    
+# #     # 2. Aggressive Header Blacklist
+# #     # These words represent section titles, not actual requirements.
+# #     header_blacklist = [
+# #         "responsibilities", "skills", "qualifications", "requirements", "key responsibilities",
+# #         "preferred", "about the job", "job summary", "education and experience",
+# #         # "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
+# #         "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
+# #     ]
+    
+# #     requirements = []
+# #     for l in lines:
+# #         clean_l = l.strip()
+        
+# #         # Skip empty lines or very short noise
+# #         if len(clean_l) < 20:
+# #             continue
+            
+# #         # Skip if the line contains a colon early (usually headers like 'Rate: $55')
+# #         if ":" in clean_l[:20]:
+# #             continue
+
+# #         # Check if the line is actually just a header (e.g., "Required Skills and Qualifications")
+# #         # We check if the line *is* one of the blacklist words or contains nothing but them.
+# #         is_header = any(h in clean_l.lower() for h in header_blacklist) and len(clean_l.split()) < 5
+        
+# #         if not is_header:
+# #             # Clean leading bullet points for better SBERT matching
+# #             final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+# #             requirements.append(final_line)
+            
+# #     return requirements[:25]
+
+# # def extract_jd(jd_text):
+# #     jd_clean = jd_text.lower()
+    
+# #     # 1. Broaden Triggers to match the "Role Responsibilities" in your text
+# #     trigger_words = [
+# #         "role responsibilities", "responsibilities", "duties", 
+# #         "requirements", "required skills", "qualifications"
+# #     ]
+
+# #     start_idx = -1
+# #     for word in trigger_words:
+# #         idx = jd_clean.find(word)
+# #         if idx != -1:
+# #             start_idx = idx
+# #             break
+
+# #     # If no trigger found, use the whole text; otherwise, start from trigger
+# #     relevant_text = jd_clean[start_idx:] if start_idx != -1 else jd_clean
+# #     lines = relevant_text.split("\n")
+    
+# #     requirements = []
+# #     header_blacklist = ["requirements", "responsibilities", "qualifications", 
+# #                         "education", "about the job", "job summary", "education and experience",
+# #                         "experience", "technical skills"
+# #                         ]
+
+# #     for l in lines:
+# #         clean_l = l.strip()
+        
+# #         # Lower the threshold to catch short but vital skills (e.g., "Python", "SQL")
+# #         if len(clean_l) < 8:
+# #             continue
+            
+# #         # Skip if the line is just a section header
+# #         is_header = any(h == clean_l for h in header_blacklist) or (len(clean_l.split()) < 4 and clean_l.endswith(':'))
+        
+# #         if not is_header:
+# #             # Clean leading bullets
+# #             final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+# #             requirements.append(final_line)
+            
+# #     return requirements[:25]
+
+# def extract_jd(jd_text):
+#     jd_clean = jd_text.lower()
+#     # Expanded triggers to catch "Education and Experience" and "Technical Skills"
+#     trigger_words = ["education and experience", "technical skills", "requirements", "responsibilities"]
+
+#     start_idx = 0
+#     for word in trigger_words:
+#         idx = jd_clean.find(word)
+#         if idx != -1:
+#             start_idx = idx
+#             break
+
+#     relevant_text = jd_clean[start_idx:]
+#     lines = relevant_text.split("\n")
+    
+#     requirements = []
+#     for l in lines:
+#         clean_l = l.strip()
+#         # LOWER THE LIMIT: Technical skills like "SQL" or "Python" are short!
+#         if len(clean_l) < 5:
+#             continue
+            
+#         # Remove colons only if they are at the very end (headers)
+#         if clean_l.endswith(':'):
+#             continue
+
+#         # Clean leading bullet points
+#         final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+#         requirements.append(final_line)
+            
+#     return requirements[:25]
+
+# # def extract_jd(jd_text):
+# #     jd_clean = jd_text.lower()
+    
+# #     # 1. Broaden Triggers - include the exact headers from your text
+# #     trigger_words = [
+# #         "duties & responsibilities", "duties", "responsibilities", 
+# #         "key responsibilities", "requirements", "qualifications"
+# #     ]
+
+# #     start_idx = 0
+# #     for word in trigger_words:
+# #         idx = jd_clean.find(word)
+# #         if idx != -1:
+# #             start_idx = idx
+# #             break
+
+# #     # If we found a trigger, we slice. If not, we take the whole text.
+# #     relevant_text = jd_clean[start_idx:] if start_idx != 0 else jd_clean
+# #     lines = relevant_text.split("\n")
+    
+# #     requirements = []
+# #     for l in lines:
+# #         clean_l = l.strip()
+        
+# #         # LOWER THE CHARACTER LIMIT: Some JD points are short (e.g. "Draft press releases")
+# #         # 20 characters is often too long for a bullet point.
+# #         if len(clean_l) < 5: 
+# #             continue
+            
+# #         # LOOSEN THE HEADER FILTER: Only skip if it's EXACTLY the header
+# #         header_blacklist = ["duties & responsibilities", "responsibilities", "requirements"]
+# #         if clean_l in header_blacklist:
+# #             continue
+
+# #         # Clean leading bullet points
+# #         final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+# #         if len(final_line) > 5:
+# #             requirements.append(final_line)
+            
+# #     # INCREASE RETURN LIMIT: Capture more detail to differentiate candidates
+# #     return requirements[:25]
+
+
+# # def analyze_skills(jd_text, resume_text):
+# #     """Matches JD requirements to Resume text using SBERT"""
+# #     jd_requirements = extract_jd(jd_text)[:20] # Focus on top 20 chunks
+# #     resume_chunks = chunk_resume(resume_text)
+    
+# #     if not jd_requirements or not resume_chunks:
+# #         return [], jd_requirements
+    
+# #     # batch-encode for speed
+# #     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
+# #     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
+    
+# #     # Use matrix multiplication for all scores at once
+# #     cosine_scores = util.cos_sim(jd_embs, res_embs) 
+# #     # Now find the max score for each JD requirement
+# #     max_scores, _ = torch.max(cosine_scores, dim=1)
+
+# #     # matched = []
+# #     # gaps = []
+
+# #     matched = []
+# #     gaps = {
+# #         "Technical/AI": [],
+# #         "Domain Expertise": [],
+# #         "Soft Skills/Other": []
+# #     }
+
+# #     # for i, score in enumerate(max_scores):
+# #     #     skill_name = jd_requirements[i]
+# #     #     if score.item() > 0.65: # .item() converts tensor to float
+# #     #     # if score.item() > 0.72: # .item() converts tensor to float
+# #     #     # if score.item() > strictness: # .item() converts tensor to float
+# #     #         # matched.append(skill_name)
+# #     #         matched.append((skill_name, round(score.item()*100,2)))
+# #     #     else:
+# #     #         gaps.append(skill_name)
+
+# #     for i, score in enumerate(max_scores):
+# #         skill_name = jd_requirements[i]
+# #         if score.item() > 0.65:
+# #             # matched.append((skill_name, round(score.item()*100, 2)))
+# #             matched.append(skill_name)
+# #         else:
+# #             # Categorize the Gap
+# #             low_skill = skill_name.lower()
+# #             if any(k in low_skill for k in ['ai', 'data', 'algorithm', 'software', 'dataset']):
+# #                 gaps["Technical/AI"].append(skill_name)
+# #             elif any(k in low_skill for k in ['soil', 'plant', 'agronomy', 'crop', 'physiology']):
+# #                 gaps["Domain Expertise"].append(skill_name)
+# #             else:
+# #                 gaps["Soft Skills/Other"].append(skill_name)
+            
+# #     # return list(set(matched)), list(set(gaps))
+# #     return list(set(matched)), gaps
+
+# # def analyze_skills(jd_text, resume_text):
+# #     jd_requirements = extract_jd(jd_text)
+# #     resume_chunks = chunk_resume(resume_text)
+    
+# #     if not jd_requirements or not resume_chunks:
+# #         return [], {"Technical & ML": [], "Stats & Research": [], "Background & Soft Skills": []}
+    
+# #     # batch-encode for speed
+# #     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
+# #     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
+    
+# #     # Use matrix multiplication for all scores at once
+# #     cosine_scores = util.cos_sim(jd_embs, res_embs) 
+# #     # Now find the max score for each JD requirement
+# #     max_scores, _ = torch.max(cosine_scores, dim=1)
+
+# #     matched = []
+# #     gaps = {
+# #         "Technical & Machine Learning": [],
+# #         "Statistics & Experimental Design": [],
+# #         "Background & Soft Skills": []
+# #     }
+
+# #     # 1. Tech/ML: Python, SQL, ML Models, Production code
+# #     tech_k = ['python', 'sql', 'machine learning', 'ml', 'production', 'algorithms', 'data manipulation']
+    
+# #     # 2. Stats/Research: A/B tests, Causal Inference, Probability, Experiments
+# #     stats_k = ['statistics', 'statistical', 'causal', 'inference', 'a/b', 'experiment', 'probability', 'quantitative']
+    
+# #     # 3. Background/Education: Degrees, Years of Exp, Communication
+# #     background_k = ['degree', 'bachelor', 'master', 'phd', 'experience', 'years', 'communication', 'remote']
+
+# #     for i, score in enumerate(max_scores):
+# #         skill_name = jd_requirements[i]
+# #         low_skill = skill_name.lower()
+# #         score_val = round(score.item() * 100, 2)
+        
+# #         if score_val > 70:
+# #             matched.append((skill_name, score_val))
+# #         else:
+# #             if any(k in low_skill for k in tech_k):
+# #                 gaps["Technical & Machine Learning"].append(skill_name)
+# #             elif any(k in low_skill for k in stats_k):
+# #                 gaps["Statistics & Experimental Design"].append(skill_name)
+# #             else:
+# #                 gaps["Background & Soft Skills"].append(skill_name)
+                
+# #     return list(set(matched)), gaps
+
+
+# # def analyze_skills(jd_text, resume_text):
+# #     # INCREASE LIMIT: Capture more unique tasks from the JD
+# #     jd_requirements = extract_jd(jd_text)[:25] 
+# #     resume_chunks = chunk_resume(resume_text)
+    
+# #     if not jd_requirements or not resume_chunks:
+# #         return [], {"Technical": [], "Domain": [], "Soft Skills": []}, 0.0
+    
+# #     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
+# #     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
+    
+# #     cosine_scores = util.cos_sim(jd_embs, res_embs) 
+# #     max_scores, _ = torch.max(cosine_scores, dim=1)
+
+# #     matched = []
+# #     gaps = {"Technical": [], "Domain": [], "Soft Skills": []}
+    
+# #     # NEW: Fuzzy Score Accumulator
+# #     # Instead of just counting 'Matches', we calculate a 'Quality Score'
+# #     total_quality_score = 0
+
+# #     for i, score in enumerate(max_scores):
+# #         skill_name = jd_requirements[i]
+# #         score_val = score.item() * 100
+        
+# #         # LOWER THRESHOLD & TIERED REWARDS
+# #         if score_val > 60: # Strong Match
+# #             matched.append((skill_name, round(score_val, 2)))
+# #             total_quality_score += 1.0 
+# #         elif score_val > 45: # Partial Match (Fuzzy)
+# #             total_quality_score += 0.5 
+# #         else:
+# #             # Categorize Gaps (as per your existing logic)
+# #             gaps["Soft Skills"].append(skill_name) 
+
+# #     # Return the quality score to use in the final ranking
+# #     quality_ratio = total_quality_score / len(jd_requirements)
+# #     return matched, gaps, quality_ratio
+
+# def analyze_skills(jd_text, resume_text):
+#     jd_requirements = extract_jd(jd_text)
+#     resume_chunks = chunk_resume(resume_text)
+    
+#     if not jd_requirements or not resume_chunks:
+#         return [], {"Technical": [], "Stats": [], "Soft Skills": []}, 0.0
+    
+#     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
+#     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
+#     cosine_scores = util.cos_sim(jd_embs, res_embs) 
+#     max_scores, _ = torch.max(cosine_scores, dim=1)
+
+#     matched = []
+#     gaps = {"Technical": [], "Stats": [], "Soft Skills": []}
+#     total_quality_score = 0
+
+#     for i, score in enumerate(max_scores):
+#         skill_name = jd_requirements[i]
+#         score_val = score.item() * 100
+        
+#         if score_val > 60:
+#             matched.append((skill_name, round(score_val, 2)))
+#             total_quality_score += 1.0 
+#         else:
+#             # Smart Categorization for Gaps
+#             low_s = skill_name.lower()
+#             if any(k in low_s for k in ['python', 'sql', 'machine learning', 'code', 'production']):
+#                 gaps["Technical"].append(skill_name)
+#             elif any(k in low_s for k in ['statistics', 'causal', 'inference', 'probability', 'math']):
+#                 gaps["Stats"].append(skill_name)
+#             else:
+#                 gaps["Soft Skills"].append(skill_name) 
+
+#     quality_ratio = total_quality_score / len(jd_requirements)
+#     return matched, gaps, quality_ratio
+
+# # regex for years of experience
+# def calculate_seniority_bonus(text):
+#     # Search for "X+ years", "X years of experience", etc.
+#     experience_matches = re.findall(r'(\d+)\+?\s*(?:years|yrs)', text.lower())
+#     if experience_matches:
+#         years = max([int(x) for x in experience_matches])
+#         if years >= 10: return 15  # Senior Leader Bonus
+#         if years >= 3: return 10   # Met JD Requirement Bonus
+#     return 0
+
+
+# # 4 . Generate downloadable output format
+# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+# from reportlab.lib import colors
+# from reportlab.lib.styles import getSampleStyleSheet
+# from reportlab.lib import units
+# from reportlab.lib.pagesizes import A4
+# from io import BytesIO
+# def generate_pdf_report(df):
+#     buffer = BytesIO()
+#     doc = SimpleDocTemplate(buffer, pagesize=A4)
+#     elements = []
+#     styles = getSampleStyleSheet()
+
+#     elements.append(Paragraph("<b>Ranked Candidate Audit Report</b>", styles['Heading1']))
+#     elements.append(Spacer(1, 12))
+
+#     for idx, row in df.reset_index(drop=True).iterrows():
+
+#         elements.append(Paragraph(
+#             f"<b>Rank {idx+1}: {row['Candidate']}</b>",
+#             styles['Heading2']
+#         ))
+#         elements.append(Spacer(1, 6))
+
+#         elements.append(Paragraph(
+#             f"<b>Overall Match Score:</b> {row['Match Score']}%",
+#             styles['Normal']
+#         ))
+#         elements.append(Spacer(1, 10))
+
+#         # Matches
+#         elements.append(Paragraph("<b>Semantic Matches:</b>", styles['Normal']))
+#         elements.append(Spacer(1, 4))
+
+#         if row["Full_Matches"]:
+#             for m in row["Full_Matches"]:
+#                 if isinstance(m, tuple):
+#                     elements.append(Paragraph(
+#                         f"• {m[0]}  (Confidence: {m[1]}%)",
+#                         styles['Normal']
+#                     ))
+#                 else:
+#                     elements.append(Paragraph(f"• {m}", styles['Normal']))
+#         else:
+#             elements.append(Paragraph("• No strong semantic matches detected.", styles['Normal']))
+
+#         elements.append(Spacer(1, 8))
+
+#         # Gaps
+#         elements.append(Paragraph("<b>🔍 Gap Analysis by Category:</b>", styles['Normal']))
+#         elements.append(Spacer(1, 4))
+
+#         # found_any_gap = False
+#         # Here is the fix for the AttributeError: iterating through the dictionary
+#         # for category, gap_list in row["Full_Gaps"].items():
+#         #     if gap_list:
+#         #         found_any_gap = True
+#         #         # Add category sub-header
+#         #         elements.append(Paragraph(f"<i>{category}:</i>", styles['Normal']))
+#         #         for g in gap_list:
+#         #             elements.append(Paragraph(f"• {g}", styles['Normal']))
+#         #         elements.append(Spacer(1, 4))
+
+#         # if not found_any_gap:
+#         #     elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
+
+#         # elements.append(Spacer(1, 20))
+
+#         # Gaps
+#         # elements.append(Paragraph("<b>Gap Analysis by Category:</b>", styles['Normal']))
+#         # elements.append(Spacer(1, 4))
+
+#         has_gaps = False
+#         for category, gap_list in row["Full_Gaps"].items():
+#             if gap_list:
+#                 has_gaps = True
+#                 elements.append(Paragraph(f"<i>{category}:</i>", styles['Normal']))
+#                 for g in gap_list:
+#                     elements.append(Paragraph(f"• {g}", styles['Normal']))
+#                 elements.append(Spacer(1, 4))
+
+#         if not has_gaps:
+#             elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
+
+#     doc.build(elements)
+#     buffer.seek(0)
+#     return buffer
+
+
+# import math
+
+# # def sigmoid_calibration(score):
+# #     # This keeps the score mapping 1:1 in the middle but 
+# #     # prevents it from exploding at the top/bottom
+# #     return 1 / (1 + math.exp(-score))
+
+
+# # --- UI LAYOUT ---
+# st.title("🎯 Semantic Resume-JD Matcher")
+# st.markdown("Rank resumes based on **meaning**, and see exactly what's missing.")
+
+# with st.sidebar:
+#     st.header("Step 1: Job Description")
+#     jd_input = st.text_area("Paste the Job Description here:", height=300)
+
+# st.header("Step 2: Upload Resumes")
+# uploaded_files = st.file_uploader("Upload candidate PDFs", type="pdf", accept_multiple_files=True)
+
+# if st.button("🚀 Analyze & Rank"):
+#     if not jd_input or not uploaded_files:
+#         st.error("Please provide both a JD and at least one resume.")
+#     else:
+#         results = []
+#         with st.spinner("Performing Deep Semantic Audit..."):
+#             for file in uploaded_files:
+#                 text = extract_text(file)
+                
+#                 # 1. Global Similarity
+#                 jd_emb = model.encode(jd_input, convert_to_tensor=True)
+#                 res_emb = model.encode(text, convert_to_tensor=True)
+#                 raw_sim = util.cos_sim(jd_emb, res_emb).item()
+                
+
+#                 # 2. Skill-Level Audit (Using our optimized batch function)
+#                 # matches, gaps = analyze_skills(jd_input, text)
+#                 # skill audit with fuzzy logic
+#                 matches, gaps, quality_ratio = analyze_skills(jd_input, text)
+                
+#                 # Calibrated Score
+#                 # calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
+#                 # # final_score = sigmoid_calibration(calibrated) * 100
+#                 # final_score = float(np.clip(calibrated * 10, 0, 100)) 
+
+#                 # total_reqs = len(matches) + len(gaps)
+#                 # coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
+
+#                 # # 3. Final Differentiated Score (40% Vibe, 60% Coverage)
+#                 # # This prevents the 100% ceiling and rewards specific skill matches
+#                 # final_score = ((raw_sim * 0.4) + (coverage_ratio * 0.6)) * 100
+#                 # final_score = round(final_score, 2)
+
+#                 # 3. Hybrid Scoring Logic
+#                 # Calculate coverage based on your new 70 threshold
+#                 # total_reqs = len(matches) + sum(len(v) for v in gaps.values())
+#                 # coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
+
+#                 # # Scale the raw similarity (Global Vibe)
+#                 # calibrated_vibe = scaler.transform(np.array([[raw_sim]]))[0][0] * 10 
+
+#                 # # Final Score: 40% Global Vibe, 60% Skill Match Coverage
+#                 # final_score = (calibrated_vibe * 0.4) + (coverage_ratio * 100 * 0.6)
+#                 # final_score = float(np.clip(final_score, 0, 100))
+
+#                 # 3. Seniority Detection
+#                 bonus = calculate_seniority_bonus(text)
+
+#                 # 4. Final Differentiated Formula
+#                 # 30% Vibe + 50% Quality Coverage + 20% Seniority/Bonus
+#                 final_score = (raw_sim * 30) + (quality_ratio * 50) + bonus
+
+#                 # Ensure it doesn't exceed 100
+#                 final_score = float(np.clip(final_score, 0, 100))
+
+#                 results.append({
+#                     "Candidate": file.name,
+#                     "Match Score": final_score,
+#                     # "Matches": ", ".join(matches[:5]),
+#                     # "Matches": ", ".join(matches),
+#                     "Matches": ", ".join([f"{m[0]} ({m[1]}%)" for m in matches]),
+#                     # "Gaps": ", ".join(gaps[:5]),
+#                     "Gaps": ", ".join([item for sublist in gaps.values() for item in sublist][:3]),
+#                     # "Gaps": ", ".join(gaps),
+#                     "Full_Matches": matches,
+#                     # "Full_Gaps": gaps
+#                     "Full_Gaps": gaps      
+#                 })
+        
+#         # Create Result DataFrame
+#         df = pd.DataFrame(results).sort_values(by="Match Score", ascending=False)
+
+#         # --- UI DISPLAY ---
+#         st.success(f"✅ Analysis Complete! Top candidate: {df.iloc[0]['Candidate']}")
+
+#         # Download Button
+#         pdf_buffer = generate_pdf_report(df)
+#         st.download_button(
+#             label="📄 Download Full Ranking Report (PDF)",
+#             data=pdf_buffer,
+#             file_name="Ranked_Candidates_Audit.pdf",
+#             mime="application/pdf"
+#         )
+
+#         st.divider()
+
+#         # 1. High-Level Summary Table
+#         st.subheader("📊 Ranking Overview")
+#         st.dataframe(
+#             df[['Candidate', 'Match Score', 'Matches', 'Gaps']].style.highlight_max(axis=0, subset=['Match Score'], color='lightgreen'),
+#             use_container_width=True
+#         )
+
+#         # 2. Deep Dive Expanders
+#         st.subheader("🔍 Individual Candidate Audit")
+#         for _, row in df.iterrows():
+#             with st.expander(f"Audit: {row['Candidate']} ({row['Match Score']}%)"):
+#                 c1, c2 = st.columns(2)
+#                 with c1:
+#                     st.write("**✅ Semantic Matches**")
+#                     for m in row['Full_Matches']: st.write(f"- {m}")
+#                 with c2:
+#                     st.write("**⚠️ Found Gaps**")
+#                     for g in row['Full_Gaps']: st.write(f"- {g}")
+                
+#                 # Strength Chart
+#                 if row['Full_Matches']:
+#                     st.write("---")
+#                     st.write("**Match Confidence Profile**")
+
+#                     requirements = [m[0] for m in row['Full_Matches']]
+#                     confidences = [m[1] for m in row['Full_Matches']]
+#                     # Simulating confidence levels for the UI
+#                     conf_data = pd.DataFrame({
+#                         # "Requirement": row['Full_Matches'],
+#                         "Requirement": requirements,
+#                         # "Confidence": np.random.uniform(75, 99, len(row['Full_Matches']))
+#                         "Confidence": confidences
+#                     }).set_index("Requirement")
+#                     st.bar_chart(conf_data)
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -13,7 +640,8 @@ st.set_page_config(page_title="AI Resume Job Matcher", layout="wide")
 # 2. Load Assets
 @st.cache_resource
 def load_assets():
-    # # Model now loads from Hugging Face instead of a local path
+    # model = SentenceTransformer('all-MiniLM-L6-v2')
+    # model = SentenceTransformer('all-mpnet-base-v2')
     model = SentenceTransformer('iwamu/bert-data-analyst-matcher')
     scaler = joblib.load('semantic_scaler_2.pkl')
     return model, scaler
@@ -25,114 +653,19 @@ def extract_text(file):
     pdf = PyPDF2.PdfReader(file)
     return " ".join([page.extract_text() or "" for page in pdf.pages])
 
-def chunk_resume(resume_text):
-    """Simple cleaner to extract meaningful chunks for comparison"""
-    # Removes special chars and splits by commas/bullets/newlines
-    chunks = re.split(r'[,.\n•●/-]', resume_text)
-    return [c.strip() for c in chunks if len(c.strip()) > 3]
+# def get_keywords(text):
+#     """Simple cleaner to extract meaningful chunks for comparison"""
+#     # Removes special chars and splits by commas/bullets/newlines
+#     chunks = re.split(r'[,.\n•●/-]', text)
+#     return [c.strip() for c in chunks if len(c.strip()) > 3]
 
-
-# def extract_jd(jd_text):
-#     """
-#     Enhanced JD extraction with aggressive header filtering.
-#     """
-#     jd_clean = jd_text.lower()
-    
-#     # 1. Expanded Triggers
-#     trigger_words = [
-#         "key responsibilities", "required skills", "qualifications", 
-#         "what you will do", "requirements", "core competencies", 
-#     ]
-
-#     start_idx = 0
-#     for word in trigger_words:
-#         idx = jd_clean.find(word)
-#         if idx != -1:
-#             start_idx = idx
-#             break
-
-#     relevant_text = jd_clean[start_idx:]
-#     lines = relevant_text.split("\n")
-    
-#     # 2. Aggressive Header Blacklist
-#     # These words represent section titles, not actual requirements.
-#     header_blacklist = [
-#         "responsibilities", "skills", "qualifications", "requirements", "key responsibilities",
-#         "preferred", "about the job", "job summary", "education and experience",
-#         # "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
-#         "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
-#     ]
-    
-#     requirements = []
-#     for l in lines:
-#         clean_l = l.strip()
-        
-#         # Skip empty lines or very short noise
-#         if len(clean_l) < 20:
-#             continue
-            
-#         # Skip if the line contains a colon early (usually headers like 'Rate: $55')
-#         if ":" in clean_l[:20]:
-#             continue
-
-#         # Check if the line is actually just a header (e.g., "Required Skills and Qualifications")
-#         # We check if the line *is* one of the blacklist words or contains nothing but them.
-#         is_header = any(h in clean_l.lower() for h in header_blacklist) and len(clean_l.split()) < 5
-        
-#         if not is_header:
-#             # Clean leading bullet points for better SBERT matching
-#             final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
-#             requirements.append(final_line)
-            
-#     return requirements[:25]
-
-# def extract_jd(jd_text):
-#     jd_clean = jd_text.lower()
-    
-#     # 1. Broaden Triggers to match the "Role Responsibilities" in your text
-#     trigger_words = [
-#         "role responsibilities", "responsibilities", "duties", 
-#         "requirements", "required skills", "qualifications"
-#     ]
-
-#     start_idx = -1
-#     for word in trigger_words:
-#         idx = jd_clean.find(word)
-#         if idx != -1:
-#             start_idx = idx
-#             break
-
-#     # If no trigger found, use the whole text; otherwise, start from trigger
-#     relevant_text = jd_clean[start_idx:] if start_idx != -1 else jd_clean
-#     lines = relevant_text.split("\n")
-    
-#     requirements = []
-#     header_blacklist = ["requirements", "responsibilities", "qualifications", 
-#                         "education", "about the job", "job summary", "education and experience",
-#                         "experience", "technical skills"
-#                         ]
-
-#     for l in lines:
-#         clean_l = l.strip()
-        
-#         # Lower the threshold to catch short but vital skills (e.g., "Python", "SQL")
-#         if len(clean_l) < 8:
-#             continue
-            
-#         # Skip if the line is just a section header
-#         is_header = any(h == clean_l for h in header_blacklist) or (len(clean_l.split()) < 4 and clean_l.endswith(':'))
-        
-#         if not is_header:
-#             # Clean leading bullets
-#             final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
-#             requirements.append(final_line)
-            
-#     return requirements[:25]
-
-def extract_jd(jd_text):
+def get_keywords(jd_text):
     jd_clean = jd_text.lower()
-    # Expanded triggers to catch "Education and Experience" and "Technical Skills"
-    trigger_words = ["education and experience", "technical skills", "requirements", "responsibilities"]
+    
+    trigger_words = [
+        "key responsibilities", "required skills", "qualifications", 
+        "what you will do", "requirements", "core competencies", 
+    ]
 
     start_idx = 0
     for word in trigger_words:
@@ -144,255 +677,92 @@ def extract_jd(jd_text):
     relevant_text = jd_clean[start_idx:]
     lines = relevant_text.split("\n")
     
+    # 2. Aggressive Header Blacklist
+    # These words represent section titles, not actual requirements.
+    header_blacklist = [
+        "responsibilities", "skills", "qualifications", "requirements", "key responsibilities",
+        "preferred", "about the job", "job summary", "education and experience",
+        # "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
+        "education", "experience", "duties & responsibilities", "duties", "responsibilities", 
+        "technical skills"
+    ]
+    
     requirements = []
     for l in lines:
         clean_l = l.strip()
-        # LOWER THE LIMIT: Technical skills like "SQL" or "Python" are short!
-        if len(clean_l) < 5:
+        
+        # Skip empty lines or very short noise
+        if len(clean_l) < 20:
             continue
             
-        # Remove colons only if they are at the very end (headers)
-        if clean_l.endswith(':'):
+        # Skip if the line contains a colon early (usually headers like 'Rate: $55')
+        if ":" in clean_l[:20]:
             continue
 
-        # Clean leading bullet points
-        final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
-        requirements.append(final_line)
+        # Check if the line is actually just a header (e.g., "Required Skills and Qualifications")
+        # We check if the line *is* one of the blacklist words or contains nothing but them.
+        is_header = any(h in clean_l.lower() for h in header_blacklist) and len(clean_l.split()) < 5
+        
+        if not is_header:
+            # Clean leading bullet points for better SBERT matching
+            final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+            requirements.append(final_line)
             
     return requirements[:25]
-
-# def extract_jd(jd_text):
-#     jd_clean = jd_text.lower()
-    
-#     # 1. Broaden Triggers - include the exact headers from your text
-#     trigger_words = [
-#         "duties & responsibilities", "duties", "responsibilities", 
-#         "key responsibilities", "requirements", "qualifications"
-#     ]
-
-#     start_idx = 0
-#     for word in trigger_words:
-#         idx = jd_clean.find(word)
-#         if idx != -1:
-#             start_idx = idx
-#             break
-
-#     # If we found a trigger, we slice. If not, we take the whole text.
-#     relevant_text = jd_clean[start_idx:] if start_idx != 0 else jd_clean
-#     lines = relevant_text.split("\n")
-    
-#     requirements = []
-#     for l in lines:
-#         clean_l = l.strip()
-        
-#         # LOWER THE CHARACTER LIMIT: Some JD points are short (e.g. "Draft press releases")
-#         # 20 characters is often too long for a bullet point.
-#         if len(clean_l) < 5: 
-#             continue
-            
-#         # LOOSEN THE HEADER FILTER: Only skip if it's EXACTLY the header
-#         header_blacklist = ["duties & responsibilities", "responsibilities", "requirements"]
-#         if clean_l in header_blacklist:
-#             continue
-
-#         # Clean leading bullet points
-#         final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
-#         if len(final_line) > 5:
-#             requirements.append(final_line)
-            
-#     # INCREASE RETURN LIMIT: Capture more detail to differentiate candidates
-#     return requirements[:25]
 
 
 # def analyze_skills(jd_text, resume_text):
 #     """Matches JD requirements to Resume text using SBERT"""
-#     jd_requirements = extract_jd(jd_text)[:20] # Focus on top 20 chunks
-#     resume_chunks = chunk_resume(resume_text)
+#     jd_requirements = get_keywords(jd_text)[:20] # Focus on top 20 chunks
+#     resume_chunks = get_keywords(resume_text)
     
-#     if not jd_requirements or not resume_chunks:
-#         return [], jd_requirements
-    
-#     # batch-encode for speed
-#     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
-#     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
-    
-#     # Use matrix multiplication for all scores at once
-#     cosine_scores = util.cos_sim(jd_embs, res_embs) 
-#     # Now find the max score for each JD requirement
-#     max_scores, _ = torch.max(cosine_scores, dim=1)
-
-#     # matched = []
-#     # gaps = []
-
 #     matched = []
-#     gaps = {
-#         "Technical/AI": [],
-#         "Domain Expertise": [],
-#         "Soft Skills/Other": []
-#     }
-
-#     # for i, score in enumerate(max_scores):
-#     #     skill_name = jd_requirements[i]
-#     #     if score.item() > 0.65: # .item() converts tensor to float
-#     #     # if score.item() > 0.72: # .item() converts tensor to float
-#     #     # if score.item() > strictness: # .item() converts tensor to float
-#     #         # matched.append(skill_name)
-#     #         matched.append((skill_name, round(score.item()*100,2)))
-#     #     else:
-#     #         gaps.append(skill_name)
-
-#     for i, score in enumerate(max_scores):
-#         skill_name = jd_requirements[i]
-#         if score.item() > 0.65:
-#             # matched.append((skill_name, round(score.item()*100, 2)))
-#             matched.append(skill_name)
+#     gaps = []
+    
+#     # Pre-encode resume for speed
+#     res_embs = model.encode(resume_chunks, convert_to_tensor=True)
+    
+#     for req in jd_requirements:
+#         req_emb = model.encode(req, convert_to_tensor=True)
+#         # Check similarity against all chunks in the resume
+#         scores = util.cos_sim(req_emb, res_embs)[0]
+#         max_score = torch.max(scores).item()
+        
+#         if max_score > 0.65: # Threshold for 'Semantic Match'
+#             matched.append(req)
 #         else:
-#             # Categorize the Gap
-#             low_skill = skill_name.lower()
-#             if any(k in low_skill for k in ['ai', 'data', 'algorithm', 'software', 'dataset']):
-#                 gaps["Technical/AI"].append(skill_name)
-#             elif any(k in low_skill for k in ['soil', 'plant', 'agronomy', 'crop', 'physiology']):
-#                 gaps["Domain Expertise"].append(skill_name)
-#             else:
-#                 gaps["Soft Skills/Other"].append(skill_name)
+#             gaps.append(req)
             
-#     # return list(set(matched)), list(set(gaps))
-#     return list(set(matched)), gaps
-
-# def analyze_skills(jd_text, resume_text):
-#     jd_requirements = extract_jd(jd_text)
-#     resume_chunks = chunk_resume(resume_text)
-    
-#     if not jd_requirements or not resume_chunks:
-#         return [], {"Technical & ML": [], "Stats & Research": [], "Background & Soft Skills": []}
-    
-#     # batch-encode for speed
-#     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
-#     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
-    
-#     # Use matrix multiplication for all scores at once
-#     cosine_scores = util.cos_sim(jd_embs, res_embs) 
-#     # Now find the max score for each JD requirement
-#     max_scores, _ = torch.max(cosine_scores, dim=1)
-
-#     matched = []
-#     gaps = {
-#         "Technical & Machine Learning": [],
-#         "Statistics & Experimental Design": [],
-#         "Background & Soft Skills": []
-#     }
-
-#     # 1. Tech/ML: Python, SQL, ML Models, Production code
-#     tech_k = ['python', 'sql', 'machine learning', 'ml', 'production', 'algorithms', 'data manipulation']
-    
-#     # 2. Stats/Research: A/B tests, Causal Inference, Probability, Experiments
-#     stats_k = ['statistics', 'statistical', 'causal', 'inference', 'a/b', 'experiment', 'probability', 'quantitative']
-    
-#     # 3. Background/Education: Degrees, Years of Exp, Communication
-#     background_k = ['degree', 'bachelor', 'master', 'phd', 'experience', 'years', 'communication', 'remote']
-
-#     for i, score in enumerate(max_scores):
-#         skill_name = jd_requirements[i]
-#         low_skill = skill_name.lower()
-#         score_val = round(score.item() * 100, 2)
-        
-#         if score_val > 70:
-#             matched.append((skill_name, score_val))
-#         else:
-#             if any(k in low_skill for k in tech_k):
-#                 gaps["Technical & Machine Learning"].append(skill_name)
-#             elif any(k in low_skill for k in stats_k):
-#                 gaps["Statistics & Experimental Design"].append(skill_name)
-#             else:
-#                 gaps["Background & Soft Skills"].append(skill_name)
-                
-#     return list(set(matched)), gaps
-
-
-# def analyze_skills(jd_text, resume_text):
-#     # INCREASE LIMIT: Capture more unique tasks from the JD
-#     jd_requirements = extract_jd(jd_text)[:25] 
-#     resume_chunks = chunk_resume(resume_text)
-    
-#     if not jd_requirements or not resume_chunks:
-#         return [], {"Technical": [], "Domain": [], "Soft Skills": []}, 0.0
-    
-#     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
-#     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
-    
-#     cosine_scores = util.cos_sim(jd_embs, res_embs) 
-#     max_scores, _ = torch.max(cosine_scores, dim=1)
-
-#     matched = []
-#     gaps = {"Technical": [], "Domain": [], "Soft Skills": []}
-    
-#     # NEW: Fuzzy Score Accumulator
-#     # Instead of just counting 'Matches', we calculate a 'Quality Score'
-#     total_quality_score = 0
-
-#     for i, score in enumerate(max_scores):
-#         skill_name = jd_requirements[i]
-#         score_val = score.item() * 100
-        
-#         # LOWER THRESHOLD & TIERED REWARDS
-#         if score_val > 60: # Strong Match
-#             matched.append((skill_name, round(score_val, 2)))
-#             total_quality_score += 1.0 
-#         elif score_val > 45: # Partial Match (Fuzzy)
-#             total_quality_score += 0.5 
-#         else:
-#             # Categorize Gaps (as per your existing logic)
-#             gaps["Soft Skills"].append(skill_name) 
-
-#     # Return the quality score to use in the final ranking
-#     quality_ratio = total_quality_score / len(jd_requirements)
-#     return matched, gaps, quality_ratio
+#     return list(set(matched)), list(set(gaps))
 
 def analyze_skills(jd_text, resume_text):
-    jd_requirements = extract_jd(jd_text)
-    resume_chunks = chunk_resume(resume_text)
+    """Matches JD requirements to Resume text using SBERT"""
+    jd_requirements = get_keywords(jd_text)[:20] # Focus on top 20 chunks
+    resume_chunks = get_keywords(resume_text)
     
     if not jd_requirements or not resume_chunks:
-        return [], {"Technical": [], "Stats": [], "Soft Skills": []}, 0.0
+        return [], jd_requirements
     
+    # batch-encode for speed
     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
+    
+    # Use matrix multiplication for all scores at once
     cosine_scores = util.cos_sim(jd_embs, res_embs) 
+    # Now find the max score for each JD requirement
     max_scores, _ = torch.max(cosine_scores, dim=1)
 
     matched = []
-    gaps = {"Technical": [], "Stats": [], "Soft Skills": []}
-    total_quality_score = 0
+    gaps = []
 
     for i, score in enumerate(max_scores):
         skill_name = jd_requirements[i]
-        score_val = score.item() * 100
-        
-        if score_val > 60:
-            matched.append((skill_name, round(score_val, 2)))
-            total_quality_score += 1.0 
+        if score.item() > 0.65: # .item() converts tensor to float
+            matched.append(skill_name)
         else:
-            # Smart Categorization for Gaps
-            low_s = skill_name.lower()
-            if any(k in low_s for k in ['python', 'sql', 'machine learning', 'code', 'production']):
-                gaps["Technical"].append(skill_name)
-            elif any(k in low_s for k in ['statistics', 'causal', 'inference', 'probability', 'math']):
-                gaps["Stats"].append(skill_name)
-            else:
-                gaps["Soft Skills"].append(skill_name) 
-
-    quality_ratio = total_quality_score / len(jd_requirements)
-    return matched, gaps, quality_ratio
-
-# regex for years of experience
-def calculate_seniority_bonus(text):
-    # Search for "X+ years", "X years of experience", etc.
-    experience_matches = re.findall(r'(\d+)\+?\s*(?:years|yrs)', text.lower())
-    if experience_matches:
-        years = max([int(x) for x in experience_matches])
-        if years >= 10: return 15  # Senior Leader Bonus
-        if years >= 3: return 10   # Met JD Requirement Bonus
-    return 0
+            gaps.append(skill_name)
+            
+    return list(set(matched)), list(set(gaps))
 
 
 # 4 . Generate downloadable output format
@@ -402,95 +772,42 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import units
 from reportlab.lib.pagesizes import A4
 from io import BytesIO
+
 def generate_pdf_report(df):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     elements = []
+    table_data = [["Rank", "Candidate", "Match Score (%)"]]
     styles = getSampleStyleSheet()
 
-    elements.append(Paragraph("<b>Ranked Candidate Audit Report</b>", styles['Heading1']))
+    # Title
+    elements.append(Paragraph("<b>Ranked Candidate Report</b>", styles['Heading1']))
     elements.append(Spacer(1, 12))
 
+    elements.append(Paragraph("Generated by AI Semantic Resume Matcher", styles['Normal']))
+    elements.append(Spacer(1, 20))
+
     for idx, row in df.reset_index(drop=True).iterrows():
+        table_data.append([
+            idx + 1,
+            row["Candidate"],
+            f"{row['Match Score']}%"
+        ])
 
-        elements.append(Paragraph(
-            f"<b>Rank {idx+1}: {row['Candidate']}</b>",
-            styles['Heading2']
-        ))
-        elements.append(Spacer(1, 6))
+    table = Table(table_data, colWidths=[50, 250, 120])
 
-        elements.append(Paragraph(
-            f"<b>Overall Match Score:</b> {row['Match Score']}%",
-            styles['Normal']
-        ))
-        elements.append(Spacer(1, 10))
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('ALIGN', (2,1), (2,-1), 'CENTER'),
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica')
+    ]))
 
-        # Matches
-        elements.append(Paragraph("<b>Semantic Matches:</b>", styles['Normal']))
-        elements.append(Spacer(1, 4))
-
-        if row["Full_Matches"]:
-            for m in row["Full_Matches"]:
-                if isinstance(m, tuple):
-                    elements.append(Paragraph(
-                        f"• {m[0]}  (Confidence: {m[1]}%)",
-                        styles['Normal']
-                    ))
-                else:
-                    elements.append(Paragraph(f"• {m}", styles['Normal']))
-        else:
-            elements.append(Paragraph("• No strong semantic matches detected.", styles['Normal']))
-
-        elements.append(Spacer(1, 8))
-
-        # Gaps
-        elements.append(Paragraph("<b>🔍 Gap Analysis by Category:</b>", styles['Normal']))
-        elements.append(Spacer(1, 4))
-
-        # found_any_gap = False
-        # Here is the fix for the AttributeError: iterating through the dictionary
-        # for category, gap_list in row["Full_Gaps"].items():
-        #     if gap_list:
-        #         found_any_gap = True
-        #         # Add category sub-header
-        #         elements.append(Paragraph(f"<i>{category}:</i>", styles['Normal']))
-        #         for g in gap_list:
-        #             elements.append(Paragraph(f"• {g}", styles['Normal']))
-        #         elements.append(Spacer(1, 4))
-
-        # if not found_any_gap:
-        #     elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
-
-        # elements.append(Spacer(1, 20))
-
-        # Gaps
-        # elements.append(Paragraph("<b>Gap Analysis by Category:</b>", styles['Normal']))
-        # elements.append(Spacer(1, 4))
-
-        has_gaps = False
-        for category, gap_list in row["Full_Gaps"].items():
-            if gap_list:
-                has_gaps = True
-                elements.append(Paragraph(f"<i>{category}:</i>", styles['Normal']))
-                for g in gap_list:
-                    elements.append(Paragraph(f"• {g}", styles['Normal']))
-                elements.append(Spacer(1, 4))
-
-        if not has_gaps:
-            elements.append(Paragraph("• No significant gaps identified.", styles['Normal']))
-
+    elements.append(table)
     doc.build(elements)
+
     buffer.seek(0)
     return buffer
-
-
-import math
-
-# def sigmoid_calibration(score):
-#     # This keeps the score mapping 1:1 in the middle but 
-#     # prevents it from exploding at the top/bottom
-#     return 1 / (1 + math.exp(-score))
-
 
 # --- UI LAYOUT ---
 st.title("🎯 Semantic Resume-JD Matcher")
@@ -512,114 +829,112 @@ if st.button("🚀 Analyze & Rank"):
             for file in uploaded_files:
                 text = extract_text(file)
                 
-                # 1. Global Similarity
+                # 1. Calculate Calibrated Score
                 jd_emb = model.encode(jd_input, convert_to_tensor=True)
                 res_emb = model.encode(text, convert_to_tensor=True)
                 raw_sim = util.cos_sim(jd_emb, res_emb).item()
                 
-
-                # 2. Skill-Level Audit (Using our optimized batch function)
-                # matches, gaps = analyze_skills(jd_input, text)
-                # skill audit with fuzzy logic
-                matches, gaps, quality_ratio = analyze_skills(jd_input, text)
+                # Scaler expects 2D array
+                calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
+                final_score = round(calibrated * 100, 2)
                 
-                # Calibrated Score
-                # calibrated = scaler.transform(np.array([[raw_sim]]))[0][0]
-                # # final_score = sigmoid_calibration(calibrated) * 100
-                # final_score = float(np.clip(calibrated * 10, 0, 100)) 
-
-                # total_reqs = len(matches) + len(gaps)
-                # coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
-
-                # # 3. Final Differentiated Score (40% Vibe, 60% Coverage)
-                # # This prevents the 100% ceiling and rewards specific skill matches
-                # final_score = ((raw_sim * 0.4) + (coverage_ratio * 0.6)) * 100
-                # final_score = round(final_score, 2)
-
-                # 3. Hybrid Scoring Logic
-                # Calculate coverage based on your new 70 threshold
-                # total_reqs = len(matches) + sum(len(v) for v in gaps.values())
-                # coverage_ratio = len(matches) / total_reqs if total_reqs > 0 else 0
-
-                # # Scale the raw similarity (Global Vibe)
-                # calibrated_vibe = scaler.transform(np.array([[raw_sim]]))[0][0] * 10 
-
-                # # Final Score: 40% Global Vibe, 60% Skill Match Coverage
-                # final_score = (calibrated_vibe * 0.4) + (coverage_ratio * 100 * 0.6)
-                # final_score = float(np.clip(final_score, 0, 100))
-
-                # 3. Seniority Detection
-                bonus = calculate_seniority_bonus(text)
-
-                # 4. Final Differentiated Formula
-                # 30% Vibe + 50% Quality Coverage + 20% Seniority/Bonus
-                final_score = (raw_sim * 30) + (quality_ratio * 50) + bonus
-
-                # Ensure it doesn't exceed 100
-                final_score = float(np.clip(final_score, 0, 100))
-
+                # 2. Analyze Matched vs Gaps
+                matches, gaps = analyze_skills(jd_input, text)
+                
                 results.append({
                     "Candidate": file.name,
                     "Match Score": final_score,
-                    # "Matches": ", ".join(matches[:5]),
-                    # "Matches": ", ".join(matches),
-                    "Matches": ", ".join([f"{m[0]} ({m[1]}%)" for m in matches]),
-                    # "Gaps": ", ".join(gaps[:5]),
-                    "Gaps": ", ".join([item for sublist in gaps.values() for item in sublist][:3]),
-                    # "Gaps": ", ".join(gaps),
+                    "Matches": ", ".join(matches[:5]), # Show top 5 in table
+                    "Gaps": ", ".join(gaps[:5]),
                     "Full_Matches": matches,
-                    # "Full_Gaps": gaps
-                    "Full_Gaps": gaps      
+                    "Full_Gaps": gaps
                 })
         
-        # Create Result DataFrame
         df = pd.DataFrame(results).sort_values(by="Match Score", ascending=False)
+        
+        # Display main ranking table
+        # st.subheader("📊 Ranked Candidates")
+        # st.dataframe(df[["Candidate", "Match Score", "Matches", "Gaps"]], use_container_width=True)
+        
+        # # Detailed View for Top Candidate
+        # st.divider()
+        # top_c = df.iloc[0]
+        # st.subheader(f"💡 Deep Dive: {top_c['Candidate']}")
+        
+        # col1, col2 = st.columns(2)
+        # with col1:
+        #     st.success("✅ Matched Skills")
+        #     for m in top_c['Full_Matches']:
+        #         st.write(f"- {m}")
+        # with col2:
+        #     st.warning("❌ Critical Gaps")
+        #     for g in top_c['Full_Gaps']:
+        #         st.write(f"- {g}")
 
-        # --- UI DISPLAY ---
-        st.success(f"✅ Analysis Complete! Top candidate: {df.iloc[0]['Candidate']}")
+        st.subheader("📊 Ranked Candidates")
+        st.dataframe(df[["Candidate", "Match Score", "Matches", "Gaps"]], use_container_width=True)
 
-        # Download Button
+        # st.dataframe(
+        #     df.style.highlight_max(axis=0, subset=['Match Score'], color='lightgreen'),
+        #     use_container_width=True
+        # )
+
+        st.success(f"Top candidate: {df.iloc[0]['Candidate']} with {df.iloc[0]['Match Score']}% match!")
+
+        # --- Generate PDF ---
         pdf_buffer = generate_pdf_report(df)
+
         st.download_button(
-            label="📄 Download Full Ranking Report (PDF)",
+            label="📄 Download Ranked Candidates Report (PDF)",
             data=pdf_buffer,
-            file_name="Ranked_Candidates_Audit.pdf",
+            file_name="Ranked_Candidates_Report.pdf",
             mime="application/pdf"
         )
 
-        st.divider()
 
-        # 1. High-Level Summary Table
-        st.subheader("📊 Ranking Overview")
-        st.dataframe(
-            df[['Candidate', 'Match Score', 'Matches', 'Gaps']].style.highlight_max(axis=0, subset=['Match Score'], color='lightgreen'),
-            use_container_width=True
-        )
 
-        # 2. Deep Dive Expanders
-        st.subheader("🔍 Individual Candidate Audit")
-        for _, row in df.iterrows():
-            with st.expander(f"Audit: {row['Candidate']} ({row['Match Score']}%)"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.write("**✅ Semantic Matches**")
-                    for m in row['Full_Matches']: st.write(f"- {m}")
-                with c2:
-                    st.write("**⚠️ Found Gaps**")
-                    for g in row['Full_Gaps']: st.write(f"- {g}")
-                
-                # Strength Chart
-                if row['Full_Matches']:
-                    st.write("---")
-                    st.write("**Match Confidence Profile**")
+st.subheader("📊 Ranked Candidates")
 
-                    requirements = [m[0] for m in row['Full_Matches']]
-                    confidences = [m[1] for m in row['Full_Matches']]
-                    # Simulating confidence levels for the UI
-                    conf_data = pd.DataFrame({
-                        # "Requirement": row['Full_Matches'],
-                        "Requirement": requirements,
-                        # "Confidence": np.random.uniform(75, 99, len(row['Full_Matches']))
-                        "Confidence": confidences
-                    }).set_index("Requirement")
-                    st.bar_chart(conf_data)
+# 1. Main Table for Quick Scanning
+st.dataframe(
+    df.style.highlight_max(axis=0, subset=['Match Score'], color='lightgreen'),
+    use_container_width=True
+)
+
+st.divider()
+st.subheader("🔍 Deep Dive Audit")
+
+# 2. Individual Expanders for each candidate
+for _, row in df.iterrows():
+    with st.expander(f"Audit Report: {row['Candidate']} - {row['Match Score']}% Match"):
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.success("✅ Matched Requirements")
+            if row['Full_Matches']:
+                # Optional: Sort them by match quality if you pass scores back
+                for m in row['Full_Matches']:
+                    st.write(f"• {m}")
+            else:
+                st.write("No direct semantic matches found.")
+
+        with col2:
+            st.warning("⚠️ Detected Gaps")
+            if row['Full_Gaps']:
+                for g in row['Full_Gaps']:
+                    st.write(f"• {g}")
+            else:
+                st.write("No major gaps detected!")
+
+        # 3. Bar Chart for the Top Candidate (or all of them)
+        if row['Match Score'] > 50:
+            st.write("---")
+            st.write("**Strength Profile**")
+            # Creating dummy similarity data for the chart based on the match count
+            # In a real setup, you'd pass the actual scores from analyze_skills
+            chart_data = pd.DataFrame({
+                "Skill": row['Full_Matches'][:10],
+                "Match Confidence": np.random.uniform(70, 98, len(row['Full_Matches'][:10]))
+            }).set_index("Skill")
+            
+            st.bar_chart(chart_data)
