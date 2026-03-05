@@ -30,51 +30,6 @@ def extract_text(file):
     pdf = PyPDF2.PdfReader(file)
     return " ".join([page.extract_text() or "" for page in pdf.pages])
 
-# extract image pdf, scanned and exported resumes
-# def extract_text(file):
-#     try:
-#         pdf = PyPDF2.PdfReader(file)
-#         text = " ".join([page.extract_text() or "" for page in pdf.pages])
-        
-#         if len(text.strip()) > 50:
-#             return text
-#     except:
-#         pass
-
-#     # OCR fallback
-#     images = convert_from_bytes(file.read())
-#     ocr_text = ""
-
-#     for img in images:
-#         ocr_text += pytesseract.image_to_string(img)
-
-#     return ocr_text
-
-# def extract_text(file):
-#     try:
-#         pdf = PyPDF2.PdfReader(file)
-#         text = " ".join([page.extract_text() or "" for page in pdf.pages])
-        
-#         if len(text.strip()) > 50:
-#             return text
-#     except:
-#         pass
-
-#     # OCR fallback
-#     file.seek(0)
-#     pdf = fitz.open(stream=file.read(), filetype="pdf")
-
-#     ocr_text = ""
-
-#     for page in pdf:
-#         pix = page.get_pixmap()
-#         img_bytes = pix.tobytes("png")
-#         img = Image.open(io.BytesIO(img_bytes))
-
-#         ocr_text += pytesseract.image_to_string(img)
-
-#     return ocr_text
-
 
 def chunk_resume(resume_text):
     """Simple cleaner to extract meaningful chunks for comparison"""
@@ -84,43 +39,81 @@ def chunk_resume(resume_text):
 
 
 
+# def extract_jd(jd_text):
+#     jd_clean = jd_text.lower()
+#     # trigger_words = ["education and experience", "technical skills", "requirements", "responsibilities"]
+#     trigger_words = [
+#         "responsibilities",
+#         "requirements",
+#         "qualifications",
+#         "skills",
+#         "experience",
+#         "job responsibilities",
+#         "job requirements"
+#         ]
+
+#     start_idx = 0
+#     for word in trigger_words:
+#         idx = jd_clean.find(word)
+#         if idx != -1:
+#             start_idx = idx
+#             break
+
+#     relevant_text = jd_clean[start_idx:]
+#     lines = relevant_text.split("\n")
+    
+#     requirements = []
+#     # Add triggers to a set for fast lookup
+#     blacklisted_headers = set(trigger_words)
+    
+#     for l in lines:
+#         clean_l = l.strip()
+#         if len(clean_l) < 5 or clean_l in blacklisted_headers or clean_l.endswith(':'):
+#             continue
+
+#         final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+#         if len(final_line) > 10: # Ensure we aren't matching on single words
+#             requirements.append(final_line)
+            
+#     return requirements[:20]
+
 def extract_jd(jd_text):
     jd_clean = jd_text.lower()
-    # trigger_words = ["education and experience", "technical skills", "requirements", "responsibilities"]
-    trigger_words = [
-        "responsibilities",
-        "requirements",
-        "qualifications",
-        "skills",
-        "experience",
-        "job responsibilities",
-        "job requirements"
-        ]
-
-    start_idx = 0
-    for word in trigger_words:
-        idx = jd_clean.find(word)
-        if idx != -1:
-            start_idx = idx
-            break
-
-    relevant_text = jd_clean[start_idx:]
+    
+    # Find section starts more robustly
+    section_keywords = [
+        "responsibilities", "requirements", "qualifications", 
+        "skills", "experience", "what we look for"
+    ]
+    
+    # Extract from first section keyword onward
+    earliest_idx = len(jd_text)
+    for keyword in section_keywords:
+        idx = jd_clean.find(keyword)
+        if idx != -1 and idx < earliest_idx:
+            earliest_idx = idx
+    
+    relevant_text = jd_text[earliest_idx:] if earliest_idx < len(jd_text) else jd_text
+    
+    # Better bullet detection
     lines = relevant_text.split("\n")
-    
     requirements = []
-    # Add triggers to a set for fast lookup
-    blacklisted_headers = set(trigger_words)
     
-    for l in lines:
-        clean_l = l.strip()
-        if len(clean_l) < 5 or clean_l in blacklisted_headers or clean_l.endswith(':'):
+    for line in lines:
+        clean_line = line.strip()
+        
+        # Skip empty, header-like, or too-short lines
+        if not clean_line or len(clean_line) < 8 or clean_line.endswith(':'):
             continue
-
-        final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
-        if len(final_line) > 10: # Ensure we aren't matching on single words
-            requirements.append(final_line)
-            
-    return requirements[:20]
+        
+        # Remove bullets more aggressively
+        cleaned = re.sub(r'^[\s\-\•\*\○\●\d\.\)]+\s*', '', clean_line)
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        
+        if len(cleaned) > 12:  
+            requirements.append(cleaned)
+    
+    return requirements[:25] 
 
 
 def analyze_skills(jd_text, resume_text):
@@ -281,8 +274,9 @@ if st.button("🚀 Analyze & Rank"):
 
                 # 4. Final Differentiated Formula
                 # 30% Vibe + 50% Quality Coverage + 20% Seniority/Bonus
-                final_score = (raw_sim * 30) + (quality_ratio * 50) + bonus
-
+                # final_score = (raw_sim * 30) + (quality_ratio * 50) + bonus
+                final_score = (raw_sim * 20) + (quality_ratio * 60) + bonus
+                
                 # Ensure it doesn't exceed 100
                 final_score = float(np.clip(final_score, 0, 100))
 
