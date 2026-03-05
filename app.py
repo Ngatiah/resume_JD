@@ -107,7 +107,10 @@ def extract_jd(jd_text):
     lines = relevant_text.split("\n")
     
     requirements = []
-    header_blacklist = ["requirements", "responsibilities", "qualifications", "education"]
+    header_blacklist = ["requirements", "responsibilities", "qualifications", 
+                        "education", "about the job", "job summary", "education and experience",
+                        "experience"
+                        ]
 
     for l in lines:
         clean_l = l.strip()
