@@ -86,46 +86,78 @@ def chunk_resume(resume_text):
             
 #     return requirements[:25]
 
+# def extract_jd(jd_text):
+#     jd_clean = jd_text.lower()
+    
+#     # 1. Broaden Triggers to match the "Role Responsibilities" in your text
+#     trigger_words = [
+#         "role responsibilities", "responsibilities", "duties", 
+#         "requirements", "required skills", "qualifications"
+#     ]
+
+#     start_idx = -1
+#     for word in trigger_words:
+#         idx = jd_clean.find(word)
+#         if idx != -1:
+#             start_idx = idx
+#             break
+
+#     # If no trigger found, use the whole text; otherwise, start from trigger
+#     relevant_text = jd_clean[start_idx:] if start_idx != -1 else jd_clean
+#     lines = relevant_text.split("\n")
+    
+#     requirements = []
+#     header_blacklist = ["requirements", "responsibilities", "qualifications", 
+#                         "education", "about the job", "job summary", "education and experience",
+#                         "experience", "technical skills"
+#                         ]
+
+#     for l in lines:
+#         clean_l = l.strip()
+        
+#         # Lower the threshold to catch short but vital skills (e.g., "Python", "SQL")
+#         if len(clean_l) < 8:
+#             continue
+            
+#         # Skip if the line is just a section header
+#         is_header = any(h == clean_l for h in header_blacklist) or (len(clean_l.split()) < 4 and clean_l.endswith(':'))
+        
+#         if not is_header:
+#             # Clean leading bullets
+#             final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+#             requirements.append(final_line)
+            
+#     return requirements[:25]
+
 def extract_jd(jd_text):
     jd_clean = jd_text.lower()
-    
-    # 1. Broaden Triggers to match the "Role Responsibilities" in your text
-    trigger_words = [
-        "role responsibilities", "responsibilities", "duties", 
-        "requirements", "required skills", "qualifications"
-    ]
+    # Expanded triggers to catch "Education and Experience" and "Technical Skills"
+    trigger_words = ["education and experience", "technical skills", "requirements", "responsibilities"]
 
-    start_idx = -1
+    start_idx = 0
     for word in trigger_words:
         idx = jd_clean.find(word)
         if idx != -1:
             start_idx = idx
             break
 
-    # If no trigger found, use the whole text; otherwise, start from trigger
-    relevant_text = jd_clean[start_idx:] if start_idx != -1 else jd_clean
+    relevant_text = jd_clean[start_idx:]
     lines = relevant_text.split("\n")
     
     requirements = []
-    header_blacklist = ["requirements", "responsibilities", "qualifications", 
-                        "education", "about the job", "job summary", "education and experience",
-                        "experience", "technical skills"
-                        ]
-
     for l in lines:
         clean_l = l.strip()
-        
-        # Lower the threshold to catch short but vital skills (e.g., "Python", "SQL")
-        if len(clean_l) < 8:
+        # LOWER THE LIMIT: Technical skills like "SQL" or "Python" are short!
+        if len(clean_l) < 5:
             continue
             
-        # Skip if the line is just a section header
-        is_header = any(h == clean_l for h in header_blacklist) or (len(clean_l.split()) < 4 and clean_l.endswith(':'))
-        
-        if not is_header:
-            # Clean leading bullets
-            final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
-            requirements.append(final_line)
+        # Remove colons only if they are at the very end (headers)
+        if clean_l.endswith(':'):
+            continue
+
+        # Clean leading bullet points
+        final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+        requirements.append(final_line)
             
     return requirements[:25]
 
@@ -277,42 +309,78 @@ def extract_jd(jd_text):
 #     return list(set(matched)), gaps
 
 
+# def analyze_skills(jd_text, resume_text):
+#     # INCREASE LIMIT: Capture more unique tasks from the JD
+#     jd_requirements = extract_jd(jd_text)[:25] 
+#     resume_chunks = chunk_resume(resume_text)
+    
+#     if not jd_requirements or not resume_chunks:
+#         return [], {"Technical": [], "Domain": [], "Soft Skills": []}, 0.0
+    
+#     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
+#     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
+    
+#     cosine_scores = util.cos_sim(jd_embs, res_embs) 
+#     max_scores, _ = torch.max(cosine_scores, dim=1)
+
+#     matched = []
+#     gaps = {"Technical": [], "Domain": [], "Soft Skills": []}
+    
+#     # NEW: Fuzzy Score Accumulator
+#     # Instead of just counting 'Matches', we calculate a 'Quality Score'
+#     total_quality_score = 0
+
+#     for i, score in enumerate(max_scores):
+#         skill_name = jd_requirements[i]
+#         score_val = score.item() * 100
+        
+#         # LOWER THRESHOLD & TIERED REWARDS
+#         if score_val > 60: # Strong Match
+#             matched.append((skill_name, round(score_val, 2)))
+#             total_quality_score += 1.0 
+#         elif score_val > 45: # Partial Match (Fuzzy)
+#             total_quality_score += 0.5 
+#         else:
+#             # Categorize Gaps (as per your existing logic)
+#             gaps["Soft Skills"].append(skill_name) 
+
+#     # Return the quality score to use in the final ranking
+#     quality_ratio = total_quality_score / len(jd_requirements)
+#     return matched, gaps, quality_ratio
+
 def analyze_skills(jd_text, resume_text):
-    # INCREASE LIMIT: Capture more unique tasks from the JD
-    jd_requirements = extract_jd(jd_text)[:25] 
+    jd_requirements = extract_jd(jd_text)
     resume_chunks = chunk_resume(resume_text)
     
     if not jd_requirements or not resume_chunks:
-        return [], {"Technical": [], "Domain": [], "Soft Skills": []}, 0.0
+        return [], {"Technical": [], "Stats": [], "Soft Skills": []}, 0.0
     
     jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
     res_embs = model.encode(resume_chunks, convert_to_tensor=True)    
-    
     cosine_scores = util.cos_sim(jd_embs, res_embs) 
     max_scores, _ = torch.max(cosine_scores, dim=1)
 
     matched = []
-    gaps = {"Technical": [], "Domain": [], "Soft Skills": []}
-    
-    # NEW: Fuzzy Score Accumulator
-    # Instead of just counting 'Matches', we calculate a 'Quality Score'
+    gaps = {"Technical": [], "Stats": [], "Soft Skills": []}
     total_quality_score = 0
 
     for i, score in enumerate(max_scores):
         skill_name = jd_requirements[i]
         score_val = score.item() * 100
         
-        # LOWER THRESHOLD & TIERED REWARDS
-        if score_val > 60: # Strong Match
+        if score_val > 60:
             matched.append((skill_name, round(score_val, 2)))
             total_quality_score += 1.0 
-        elif score_val > 45: # Partial Match (Fuzzy)
-            total_quality_score += 0.5 
         else:
-            # Categorize Gaps (as per your existing logic)
-            gaps["Soft Skills"].append(skill_name) 
+            # Smart Categorization for Gaps
+            low_s = skill_name.lower()
+            if any(k in low_s for k in ['python', 'sql', 'machine learning', 'code', 'production']):
+                gaps["Technical"].append(skill_name)
+            elif any(k in low_s for k in ['statistics', 'causal', 'inference', 'probability', 'math']):
+                gaps["Stats"].append(skill_name)
+            else:
+                gaps["Soft Skills"].append(skill_name) 
 
-    # Return the quality score to use in the final ranking
     quality_ratio = total_quality_score / len(jd_requirements)
     return matched, gaps, quality_ratio
 
