@@ -45,8 +45,8 @@
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/Ngatiah/Final-year-prj.git
-cd Final-year-prj
+git clone https://github.com/Ngatiah/resume_JD.git
+cd resume_JD
 
 ```
 
