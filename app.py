@@ -13,7 +13,6 @@ from typing import Dict, List, Tuple
 # ============================================
 # ENHANCED JD EXTRACTOR (INTEGRATED)
 # ============================================
-
 class EnhancedJDExtractor:
     """
     Intelligent job description extractor that handles:
@@ -131,6 +130,14 @@ class EnhancedJDExtractor:
             'ideally',
             'optional'
         }
+
+        # group 7 : trigger keywords
+        self.blacklist_trigger_words = {
+            'responsibilities', 'requirements', 'qualifications',
+            'skills', 'experience', 'professional', 'education',
+            'background', 'duties', 'accountabilities', ...
+        }
+
         
         # Combine all for quick lookup
         self.all_keywords = (
@@ -139,7 +146,8 @@ class EnhancedJDExtractor:
             self.qualification_keywords |
             self.skill_keywords |
             self.experience_keywords |
-            self.preferred_keywords
+            self.preferred_keywords |
+            self.blacklist_trigger_words
         )
     
     def find_all_sections(self, jd_text: str) -> List[Tuple[str, int, str]]:
@@ -180,6 +188,7 @@ class EnhancedJDExtractor:
         else:
             content = jd_text[start_pos:next_section_pos]
         return content
+    
     
     def parse_bullets_and_lines(self, text: str) -> List[str]:
         """Parse bullet points and numbered lists from text"""
@@ -275,6 +284,13 @@ class EnhancedJDExtractor:
         
         return self.parse_bullets_and_lines(jd_text)[:25]
 
+
+def is_trigger_keyword(self, item: str) -> bool:
+    """Returns True if item should be filtered out"""
+    if item.lower() in self.blacklist_trigger_words:
+        return True
+    # Also checks if item is mostly trigger words
+    return False
 
 # ============================================
 # GAP SEVERITY CLASSES
