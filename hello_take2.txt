@@ -1,3 +1,5 @@
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -11,273 +13,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 # ============================================
-# ENHANCED JD EXTRACTOR (INTEGRATED)
-# ============================================
-
-class EnhancedJDExtractor:
-    """
-    Intelligent job description extractor that handles:
-    - Multiple keyword variations
-    - Section detection and prioritization
-    - Nested sections
-    - Various formatting styles
-    """
-    
-    def __init__(self):
-        """Initialize with comprehensive trigger keyword groups"""
-        
-        # Group 1: RESPONSIBILITIES/DUTIES
-        self.responsibility_keywords = {
-            'responsibilities',
-            'responsibility',
-            'key responsibilities',
-            'primary responsibilities',
-            'job responsibilities',
-            'main responsibilities',
-            'core responsibilities',
-            'essential responsibilities',
-            'job duties',
-            'duties',
-            'what you will do',
-            'what you\'ll do',
-            'role responsibilities',
-            'key accountabilities',
-            'accountabilities',
-            'you will',
-            'main duties'
-        }
-        
-        # Group 2: REQUIREMENTS/QUALIFICATIONS
-        self.requirement_keywords = {
-            'requirements',
-            'requirement',
-            'required',
-            'required qualifications',
-            'basic requirements',
-            'minimum requirements',
-            'job requirements',
-            'technical requirements',
-            'core requirements',
-            'essential requirements',
-            'must haves',
-            'must have',
-            'hard requirements',
-            'mandatory requirements',
-            'what we need'
-        }
-        
-        # Group 3: QUALIFICATIONS/EDUCATION
-        self.qualification_keywords = {
-            'qualifications',
-            'qualification',
-            'qualified',
-            'education and experience',
-            'education',
-            'educational background',
-            'educational requirements',
-            'degree required',
-            'required education',
-            'academic qualifications',
-            'background',
-            'experience and education',
-            'required qualifications',
-            'preferred qualifications'
-        }
-        
-        # Group 4: SKILLS
-        self.skill_keywords = {
-            'skills',
-            'skill',
-            'technical skills',
-            'required skills',
-            'necessary skills',
-            'key skills',
-            'core skills',
-            'competencies',
-            'technical competencies',
-            'skills and abilities',
-            'abilities',
-            'expertise',
-            'proficiency',
-            'what we\'re looking for'
-        }
-        
-        # Group 5: EXPERIENCE
-        self.experience_keywords = {
-            'experience',
-            'required experience',
-            'years of experience',
-            'professional experience',
-            'relevant experience',
-            'prior experience',
-            'work experience',
-            'industry experience',
-            'background experience',
-            'preferred experience'
-        }
-        
-        # Group 6: PREFERRED/NICE-TO-HAVE
-        self.preferred_keywords = {
-            'preferred',
-            'preferred qualifications',
-            'preferred skills',
-            'nice to have',
-            'nice-to-have',
-            'bonus',
-            'a plus',
-            'extra credit',
-            'desirable',
-            'would be great',
-            'ideally',
-            'optional'
-        }
-        
-        # Combine all for quick lookup
-        self.all_keywords = (
-            self.responsibility_keywords |
-            self.requirement_keywords |
-            self.qualification_keywords |
-            self.skill_keywords |
-            self.experience_keywords |
-            self.preferred_keywords
-        )
-    
-    def find_all_sections(self, jd_text: str) -> List[Tuple[str, int, str]]:
-        """Find all section headers and their content"""
-        jd_clean = jd_text.lower()
-        sections = []
-        
-        for keyword in self.all_keywords:
-            pattern = r'\b' + re.escape(keyword) + r'\b'
-            for match in re.finditer(pattern, jd_clean):
-                start_pos = match.start()
-                
-                if keyword in self.responsibility_keywords:
-                    section_type = 'responsibility'
-                elif keyword in self.requirement_keywords:
-                    section_type = 'requirement'
-                elif keyword in self.qualification_keywords:
-                    section_type = 'qualification'
-                elif keyword in self.skill_keywords:
-                    section_type = 'skill'
-                elif keyword in self.experience_keywords:
-                    section_type = 'experience'
-                elif keyword in self.preferred_keywords:
-                    section_type = 'preferred'
-                else:
-                    section_type = 'other'
-                
-                sections.append((section_type, start_pos, keyword))
-        
-        sections.sort(key=lambda x: x[1])
-        return sections
-    
-    def extract_section_content(self, jd_text: str, start_pos: int, 
-                               next_section_pos: int = None) -> str:
-        """Extract content between section header and next section"""
-        if next_section_pos is None:
-            content = jd_text[start_pos:]
-        else:
-            content = jd_text[start_pos:next_section_pos]
-        return content
-    
-    def parse_bullets_and_lines(self, text: str) -> List[str]:
-        """Parse bullet points and numbered lists from text"""
-        lines = text.split('\n')
-        parsed_items = []
-        
-        for line in lines:
-            clean_line = line.strip()
-            
-            if not clean_line or len(clean_line) < 8 or clean_line.endswith(':'):
-                continue
-            
-            # Remove common bullet formats
-            cleaned = re.sub(
-                r'^[\s]*'
-                r'(?:'
-                r'[•\-\*\○\●]'
-                r'|'
-                r'\d+[.\)]\s*'
-                r'|'
-                r'[a-zA-Z]\s*[.\)]\s*'
-                r'|'
-                r'\[\s*[xX\-]\s*\]'
-                r')'
-                r'\s*',
-                '',
-                clean_line
-            )
-            
-            cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-            
-            if len(cleaned) > 10:
-                parsed_items.append(cleaned)
-        
-        return parsed_items
-    
-    def extract_from_sections(self, jd_text: str, 
-                            include_preferred: bool = True,
-                            max_items: int = 25) -> List[str]:
-        """Extract requirements from all identified sections"""
-        sections = self.find_all_sections(jd_text)
-        
-        if not sections:
-            return self.parse_bullets_and_lines(jd_text)[:max_items]
-        
-        all_requirements = []
-        
-        for i, (section_type, start_pos, keyword) in enumerate(sections):
-            if section_type == 'preferred' and not include_preferred:
-                continue
-            
-            if i < len(sections) - 1:
-                end_pos = sections[i + 1][1]
-            else:
-                end_pos = len(jd_text)
-            
-            section_content = self.extract_section_content(jd_text, start_pos, end_pos)
-            items = self.parse_bullets_and_lines(section_content)
-            
-            for item in items:
-                all_requirements.append(item)
-        
-        # Remove duplicates
-        seen = set()
-        unique_requirements = []
-        for item in all_requirements:
-            item_lower = item.lower()
-            if item_lower not in seen and len(item) > 10:
-                seen.add(item_lower)
-                unique_requirements.append(item)
-        
-        return unique_requirements[:max_items]
-    
-    def extract_jd_optimized(self, jd_text: str) -> List[str]:
-        """Optimized extraction with fallbacks"""
-        requirements = self.extract_from_sections(jd_text, include_preferred=True)
-        
-        if requirements:
-            return requirements
-        
-        jd_clean = jd_text.lower()
-        earliest_pos = len(jd_text)
-        
-        for keyword in self.all_keywords:
-            idx = jd_clean.find(keyword)
-            if idx != -1 and idx < earliest_pos:
-                earliest_pos = idx
-        
-        if earliest_pos < len(jd_text):
-            remaining_text = jd_text[earliest_pos:]
-            requirements = self.parse_bullets_and_lines(remaining_text)
-            return requirements[:25]
-        
-        return self.parse_bullets_and_lines(jd_text)[:25]
-
-
-# ============================================
-# GAP SEVERITY CLASSES
+# GAP SEVERITY CLASSES (Integrated)
 # ============================================
 
 class GapSeverity(Enum):
@@ -540,10 +276,9 @@ def load_assets():
     model = SentenceTransformer('iwamu/bert-data-analyst-matcher')
     scaler = joblib.load('semantic_scaler_2.pkl')
     severity_analyzer = GapSeverityAnalyzer()
-    jd_extractor = EnhancedJDExtractor()
-    return model, scaler, severity_analyzer, jd_extractor
+    return model, scaler, severity_analyzer
 
-model, scaler, severity_analyzer, jd_extractor = load_assets()
+model, scaler, severity_analyzer = load_assets()
 
 
 # ============================================
@@ -562,11 +297,51 @@ def chunk_resume(resume_text):
     return [c.strip() for c in chunks if len(c.strip()) > 3]
 
 
-def analyze_skills_with_severity(jd_text, resume_text):
-    """Enhanced analyze_skills function with gap severity"""
+def extract_jd(jd_text):
+    """Extract requirements from job description"""
+    jd_clean = jd_text.lower()
+    trigger_words = [
+        "responsibilities",
+        "requirements",
+        "qualifications",
+        "skills",
+        "experience",
+        "job responsibilities",
+        "job requirements",
+        "education and experience",
+        "education"
+    ]
+
+    start_idx = 0
+    for word in trigger_words:
+        idx = jd_clean.find(word)
+        if idx != -1:
+            start_idx = idx
+            break
+
+    relevant_text = jd_clean[start_idx:]
+    lines = relevant_text.split("\n")
     
-    # Use enhanced extractor
-    jd_requirements = jd_extractor.extract_jd_optimized(jd_text)
+    requirements = []
+    blacklisted_headers = set(trigger_words)
+    
+    for l in lines:
+        clean_l = l.strip()
+        if len(clean_l) < 5 or clean_l in blacklisted_headers or clean_l.endswith(':'):
+            continue
+
+        final_line = re.sub(r'^[\-\•\*\○\●\d\.\s]+', '', clean_l)
+        if len(final_line) > 10:
+            requirements.append(final_line)
+            
+    return requirements[:20]
+
+
+def analyze_skills_with_severity(jd_text, resume_text):
+    """
+    Enhanced analyze_skills function with gap severity
+    """
+    jd_requirements = extract_jd(jd_text)
     resume_chunks = chunk_resume(resume_text)
     
     if not jd_requirements or not resume_chunks:
@@ -592,13 +367,14 @@ def analyze_skills_with_severity(jd_text, resume_text):
         skill_name = jd_requirements[i]
         score_val = score.item() * 100
         
-        if score_val > 60:
+        if score_val > 60:  # Strong match
             matched.append((skill_name, round(score_val, 2)))
             total_quality_score += 1.0
-        elif score_val > 45:
+        elif score_val > 45:  # Partial match
             matched.append((skill_name + " (Partial)", round(score_val, 2)))
             total_quality_score += 0.5
         else:
+            # Categorize for gaps
             low_s = skill_name.lower()
             if any(k in low_s for k in ['python', 'sql', 'machine learning', 'code', 'production']):
                 gaps_basic["Technical"].append(skill_name)
@@ -617,8 +393,7 @@ def analyze_skills_with_severity(jd_text, resume_text):
         "gaps_by_severity": severity_organized,
         "gaps_basic": gaps_basic,
         "quality_ratio": quality_ratio,
-        "gap_summary": severity_analyzer.format_gap_report(severity_organized),
-        "extracted_requirements": jd_requirements  # For debugging
+        "gap_summary": severity_analyzer.format_gap_report(severity_organized)
     }
 
 
@@ -657,6 +432,7 @@ def generate_pdf_report(df):
             styles['Heading2']
         ))
         
+        # Score + Severity Summary
         elements.append(Paragraph(
             f"<b>Overall Match Score:</b> {row['Match Score']:.2f}%",
             styles['Normal']
@@ -731,14 +507,6 @@ st.markdown("Rank resumes based on **meaning** and see exactly what's missing wi
 with st.sidebar:
     st.header("Step 1: Job Description")
     jd_input = st.text_area("Paste the Job Description here:", height=300)
-    
-    # Debug option
-    if st.checkbox("Debug: Show extracted requirements"):
-        if jd_input:
-            extracted = jd_extractor.extract_jd_optimized(jd_input)
-            st.write(f"**Found {len(extracted)} requirements:**")
-            for i, req in enumerate(extracted, 1):
-                st.caption(f"{i}. {req}")
 
 st.header("Step 2: Upload Resumes")
 uploaded_files = st.file_uploader("Upload candidate PDFs", type="pdf", accept_multiple_files=True)
