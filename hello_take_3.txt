@@ -13,7 +13,6 @@ from typing import Dict, List, Tuple
 # ============================================
 # ENHANCED JD EXTRACTOR (INTEGRATED)
 # ============================================
-
 class EnhancedJDExtractor:
     """
     Intelligent job description extractor that handles:
@@ -21,7 +20,6 @@ class EnhancedJDExtractor:
     - Section detection and prioritization
     - Nested sections
     - Various formatting styles
-    - FILTERS OUT trigger keywords from actual requirements
     """
     
     def __init__(self):
@@ -132,6 +130,14 @@ class EnhancedJDExtractor:
             'ideally',
             'optional'
         }
+
+        # group 7 : trigger keywords
+        # self.blacklist_trigger_words = {
+        #     'responsibilities', 'requirements', 'qualifications',
+        #     'skills', 'experience', 'professional', 'education',
+        #     'background', 'duties', 'accountabilities', ...
+        # }
+
         
         # Combine all for quick lookup
         self.all_keywords = (
@@ -140,42 +146,10 @@ class EnhancedJDExtractor:
             self.qualification_keywords |
             self.skill_keywords |
             self.experience_keywords |
-            self.preferred_keywords
+            self.preferred_keywords 
+            # |
+            # self.blacklist_trigger_words
         )
-        
-        # BLACKLIST: Keywords that should never appear in semantic matches
-        # These are section headers/trigger words, not actual requirements
-        self.blacklist_trigger_words = {
-            'responsibilities',
-            'responsibility',
-            'requirements',
-            'requirement',
-            'required',
-            'qualifications',
-            'qualification',
-            'qualified',
-            'skills',
-            'skill',
-            'experience',
-            'preferred',
-            'professional',
-            'education',
-            'background',
-            'duties',
-            'accountabilities',
-            'competencies',
-            'abilities',
-            'expertise',
-            'what we need',
-            'what we\'re looking for',
-            'core',
-            'essential',
-            'technical',
-            'soft',
-            'hard',
-            'basic',
-            'advanced'
-        }
     
     def find_all_sections(self, jd_text: str) -> List[Tuple[str, int, str]]:
         """Find all section headers and their content"""
@@ -199,6 +173,8 @@ class EnhancedJDExtractor:
                     section_type = 'experience'
                 elif keyword in self.preferred_keywords:
                     section_type = 'preferred'
+                # elif keyword in self.blacklist_trigger_words:
+                #     section_type = 'trigger_words'
                 else:
                     section_type = 'other'
                 
@@ -215,6 +191,7 @@ class EnhancedJDExtractor:
         else:
             content = jd_text[start_pos:next_section_pos]
         return content
+    
     
     def parse_bullets_and_lines(self, text: str) -> List[str]:
         """Parse bullet points and numbered lists from text"""
@@ -251,36 +228,24 @@ class EnhancedJDExtractor:
         
         return parsed_items
     
-    def is_trigger_keyword(self, item: str) -> bool:
-        """
-        Check if item is just a trigger keyword (section header)
-        Returns True if should be FILTERED OUT
-        """
-        item_lower = item.lower().strip()
-        
-        # If item is exactly one of our trigger words, filter it
-        if item_lower in self.blacklist_trigger_words:
-            return True
-        
-        # If item is very short (2-3 words) and consists mostly of trigger words, filter it
-        words = item_lower.split()
-        if len(words) <= 3:
-            trigger_word_count = sum(1 for word in words if word in self.blacklist_trigger_words)
-            if trigger_word_count >= len(words) - 1:  # Most/all words are triggers
-                return True
-        
-        return False
+    # def is_trigger_keyword(self, item: str) -> bool:
+    #     """Returns True if item should be filtered out"""
+    #     if item.lower() in self.blacklist_trigger_words:
+    #         return True
+    #     # Also checks if item is mostly trigger words
+    #     return False
     
     def extract_from_sections(self, jd_text: str, 
                             include_preferred: bool = True,
                             max_items: int = 25) -> List[str]:
         """Extract requirements from all identified sections"""
         sections = self.find_all_sections(jd_text)
+
+        # if not self.is_trigger_keyword(item):
+        #     unique_requirements.append(item)
         
         if not sections:
-            requirements = self.parse_bullets_and_lines(jd_text)
-            # Filter out trigger keywords
-            return [r for r in requirements if not self.is_trigger_keyword(r)][:max_items]
+            return self.parse_bullets_and_lines(jd_text)[:max_items]
         
         all_requirements = []
         
@@ -299,13 +264,12 @@ class EnhancedJDExtractor:
             for item in items:
                 all_requirements.append(item)
         
-        # Remove duplicates and trigger keywords
+        # Remove duplicates
         seen = set()
         unique_requirements = []
         for item in all_requirements:
             item_lower = item.lower()
-            # Filter out trigger keywords AND duplicates
-            if item_lower not in seen and len(item) > 10 and not self.is_trigger_keyword(item):
+            if item_lower not in seen and len(item) > 10:
                 seen.add(item_lower)
                 unique_requirements.append(item)
         
@@ -329,8 +293,7 @@ class EnhancedJDExtractor:
         if earliest_pos < len(jd_text):
             remaining_text = jd_text[earliest_pos:]
             requirements = self.parse_bullets_and_lines(remaining_text)
-            # Filter out trigger keywords
-            return [r for r in requirements if not self.is_trigger_keyword(r)][:25]
+            return requirements[:25]
         
         return self.parse_bullets_and_lines(jd_text)[:25]
 
@@ -624,7 +587,7 @@ def chunk_resume(resume_text):
 def analyze_skills_with_severity(jd_text, resume_text):
     """Enhanced analyze_skills function with gap severity"""
     
-    # Use enhanced extractor (now filters out trigger keywords!)
+    # Use enhanced extractor
     jd_requirements = jd_extractor.extract_jd_optimized(jd_text)
     resume_chunks = chunk_resume(resume_text)
     
@@ -677,7 +640,7 @@ def analyze_skills_with_severity(jd_text, resume_text):
         "gaps_basic": gaps_basic,
         "quality_ratio": quality_ratio,
         "gap_summary": severity_analyzer.format_gap_report(severity_organized),
-        "extracted_requirements": jd_requirements
+        "extracted_requirements": jd_requirements  # For debugging
     }
 
 
@@ -795,7 +758,7 @@ with st.sidebar:
     if st.checkbox("Debug: Show extracted requirements"):
         if jd_input:
             extracted = jd_extractor.extract_jd_optimized(jd_input)
-            st.write(f"**Found {len(extracted)} requirements (trigger keywords filtered):**")
+            st.write(f"**Found {len(extracted)} requirements:**")
             for i, req in enumerate(extracted, 1):
                 st.caption(f"{i}. {req}")
 
