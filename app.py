@@ -429,7 +429,6 @@ if st.button("🚀 Analyze & Rank"):
                 # Gaps organized by severity
                 # Gaps organized by severity
                 st.write("**⚠️ Skill Gaps by Priority**")
-                
                 gaps_by_severity = row['Full_Gaps']
                 
                 # CRITICAL GAPS
