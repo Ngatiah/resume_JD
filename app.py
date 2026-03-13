@@ -248,7 +248,13 @@ class EnhancedJDExtractor:
             pattern = (
                 r'^[\s]*'
                 r'(?:'
-                # ... multi-line pattern
+                r'[•\-\*\○\●]'
+                r'|'
+                r'\d+[.\)]\s*'
+                r'|'
+                r'[a-zA-Z]\s*[.\)]\s*'
+                r'|'
+                r'\[\s*[xX\-]\s*\]'
                 r')'
                 r'\s*'
             )
