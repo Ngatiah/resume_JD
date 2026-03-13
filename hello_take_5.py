@@ -218,92 +218,6 @@ def calculate_seniority_bonus(text):
     return 0
 
 
-def generate_pdf_report(df):
-    """Generate downloadable PDF report with gap severity details"""
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.lib.pagesizes import A4
-    from io import BytesIO
-    
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50)
-    elements = []
-    styles = getSampleStyleSheet()
-
-    elements.append(Paragraph("<b>Ranked Candidate Audit Report (With Gap Severity)</b>", styles['Heading1']))
-    elements.append(Spacer(1, 12))
-
-    for idx, row in df.reset_index(drop=True).iterrows():
-        
-        elements.append(Paragraph(
-            f"<b>Rank {idx+1}: {row['Candidate']}</b>",
-            styles['Heading2']
-        ))
-        
-        elements.append(Paragraph(
-            f"<b>Overall Match Score:</b> {row['Match Score']:.2f}%",
-            styles['Normal']
-        ))
-        
-        elements.append(Paragraph(
-            f"<b>Gap Severity Summary:</b> 🔴 Critical: {row['Critical_Gaps']} | "
-            f"🟠 High: {row['High_Gaps']} | 🟡 Medium: {row['Medium_Gaps']}",
-            styles['Normal']
-        ))
-        elements.append(Spacer(1, 10))
-        
-        # Matches
-        elements.append(Paragraph("<b>✅ Semantic Matches:</b>", styles['Normal']))
-        if row["Full_Matches"]:
-            for m in row["Full_Matches"]:
-                elements.append(Paragraph(
-                    f"• {m[0]} (Confidence: {m[1]}%)",
-                    styles['Normal']
-                ))
-        else:
-            elements.append(Paragraph("• No strong matches detected.", styles['Normal']))
-        
-        elements.append(Spacer(1, 12))
-        
-        # Severity-organized gaps
-        elements.append(Paragraph("<b>⚠️ Gaps by Severity:</b>", styles['Normal']))
-        elements.append(Spacer(1, 4))
-        
-        gaps_by_severity = row["Full_Gaps"]
-        
-        if gaps_by_severity.get("Critical"):
-            elements.append(Paragraph("<b><font color=red>🔴 CRITICAL (Deal-breakers):</font></b>", styles['Normal']))
-            for gap in gaps_by_severity["Critical"]:
-                elements.append(Paragraph(
-                    f"• {gap.skill}<br/><i>Category: {gap.category}</i>",
-                    styles['Normal']
-                ))
-            elements.append(Spacer(1, 6))
-        
-        if gaps_by_severity.get("High"):
-            elements.append(Paragraph("<b><font color=orange>🟠 HIGH (Strongly Preferred):</font></b>", styles['Normal']))
-            for gap in gaps_by_severity["High"]:
-                elements.append(Paragraph(
-                    f"• {gap.skill} (Category: {gap.category})",
-                    styles['Normal']
-                ))
-            elements.append(Spacer(1, 6))
-        
-        if gaps_by_severity.get("Medium"):
-            elements.append(Paragraph("<b>🟡 MEDIUM (Nice-to-Have):</b>", styles['Normal']))
-            for gap in gaps_by_severity["Medium"]:
-                elements.append(Paragraph(f"• {gap.skill}", styles['Normal']))
-            elements.append(Spacer(1, 6))
-        
-        elements.append(Spacer(1, 12))
-        elements.append(Paragraph("---", styles['Normal']))
-        elements.append(Spacer(1, 12))
-
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
-
-
 # ============================================
 # UI LAYOUT
 # ============================================
@@ -366,116 +280,40 @@ if st.button("🚀 Analyze & Rank"):
                     st.error(f"Error processing {file.name}: {e}")
                     continue
         
-        # Create Result DataFrame
-        df = pd.DataFrame(results).sort_values(by="Match Score", ascending=False)
-        
-        st.success(f"✅ Analysis Complete! Top candidate: {df.iloc[0]['Candidate']}")
-        st.divider()
-        
-        # Download PDF Report
-        pdf_buffer = generate_pdf_report(df)
-        st.download_button(
-            label="📄 Download Full Ranking Report (PDF)",
-            data=pdf_buffer,
-            file_name="Ranked_Candidates_Audit.pdf",
-            mime="application/pdf"
-        )
-        
-        st.divider()
-        
-        # Ranking Overview Table
-        st.subheader("📊 Ranking Overview")
-        display_df = df[['Candidate', 'Match Score']].copy()
-        display_df['🔴 Critical'] = df['Critical_Gaps']
-        display_df['🟠 High'] = df['High_Gaps']
-        display_df['🟡 Medium'] = df['Medium_Gaps']
-        display_df['Total Issues'] = df['Critical_Gaps'] + df['High_Gaps'] + df['Medium_Gaps']
-        
-        st.dataframe(
-            display_df.style.highlight_max(axis=0, subset=['Match Score'], color='lightgreen'),
-            use_container_width=True
-        )
-        
-        st.divider()
-        
-        # Individual Candidate Audits with Gap Severity
-        st.subheader("🔍 Individual Candidate Audit")
-        for _, row in df.iterrows():
-            with st.expander(f"Audit: {row['Candidate']} ({row['Match Score']:.2f}%)"):
-                
-                # Quick metrics
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("🔴 Critical", row['Critical_Gaps'])
-                with col2:
-                    st.metric("🟠 High", row['High_Gaps'])
-                with col3:
-                    st.metric("🟡 Medium", row['Medium_Gaps'])
-                with col4:
-                    st.metric("✅ Matches", len(row['Full_Matches']))
-                
-                st.divider()
-                
-                # Semantic Matches
-                st.write("**✅ Semantic Matches**")
-                if row['Full_Matches']:
-                    for m in row['Full_Matches']:
-                        st.write(f"- {m[0]} (Confidence: {m[1]}%)")
-                else:
-                    st.write("- No strong matches detected.")
-                
-                st.divider()
-                
-                # Gaps organized by severity
-                st.write("**⚠️ Skill Gaps by Priority**")
-                gaps_by_severity = row['Full_Gaps']
-                
-                # CRITICAL GAPS
-                critical_gaps = gaps_by_severity.get("Critical", [])
-                if critical_gaps:
-                    st.markdown("### 🔴 **CRITICAL GAPS** (Deal-breakers)")
-                    st.markdown("These are must-have skills or experience levels. Without these, the candidate may not be ready for this role.")
-                    for gap in critical_gaps:
-                        st.error(f"**{gap.skill}**")
-                        st.caption(f"Category: {gap.category}")
-                        st.caption(f"Reason: {gap.reason}")
-                        st.caption(f"Frequency: Mentioned {gap.frequency}x in JD")
-                
-                # HIGH GAPS
-                high_gaps = gaps_by_severity.get("High", [])
-                if high_gaps:
-                    st.markdown("### 🟠 **HIGH-PRIORITY GAPS** (Strongly Preferred)")
-                    st.markdown("Important to have, but candidate could potentially grow into these with training or mentoring.")
-                    for gap in high_gaps:
-                        st.warning(f"**{gap.skill}**")
-                        st.caption(f"Category: {gap.category}")
-                        st.caption(f"Reason: {gap.reason}")
-                        st.caption(f"Frequency: Mentioned {gap.frequency}x in JD")
-                
-                # MEDIUM GAPS
-                medium_gaps = gaps_by_severity.get("Medium", [])
-                if medium_gaps:
-                    st.markdown("### 🟡 **MEDIUM-PRIORITY GAPS** (Nice-to-Have)")
-                    st.markdown("Would be valuable, but not essential. Candidate can likely learn these on the job.")
-                    for gap in medium_gaps:
-                        st.info(f"**{gap.skill}**")
-                        st.caption(f"Category: {gap.category}")
-                        st.caption(f"Reason: {gap.reason}")
-                
-                # LOW GAPS
-                low_gaps = gaps_by_severity.get("Low", [])
-                if low_gaps and st.checkbox(f"Show Low-Priority gaps for {row['Candidate']}", key=f"low_{row['Candidate']}"):
-                    st.markdown("### 🟢 **LOW-PRIORITY GAPS** (Learning Opportunity)")
-                    for gap in low_gaps:
-                        st.write(f"- {gap.skill}")
-                
-                st.divider()
-                
-                # Match Confidence Chart
-                if row['Full_Matches']:
-                    st.write("**Match Confidence Profile**")
-                    match_data = pd.DataFrame({
-                        "Requirement": [m[0][:50] for m in row['Full_Matches']],
-                        "Confidence": [m[1] for m in row['Full_Matches']]
-                    }).set_index("Requirement")
-                    st.bar_chart(match_data)
+        if results:
+            df = pd.DataFrame(results).sort_values(by="Match Score", ascending=False)
+            
+            st.success(f"✅ Analysis Complete! Top candidate: {df.iloc[0]['Candidate']}")
+            st.divider()
+            
+            st.subheader("📊 Ranking Overview")
+            display_df = df[['Candidate', 'Match Score']].copy()
+            display_df['🔴 Critical'] = df['Critical_Gaps']
+            display_df['🟠 High'] = df['High_Gaps']
+            display_df['🟡 Medium'] = df['Medium_Gaps']
+            
+            st.dataframe(
+                display_df.style.highlight_max(axis=0, subset=['Match Score'], color='lightgreen'),
+                use_container_width=True
+            )
+            
+            st.subheader("🔍 Individual Candidate Audit")
+            for _, row in df.iterrows():
+                with st.expander(f"Audit: {row['Candidate']} ({row['Match Score']:.2f}%)"):
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("🔴 Critical", row['Critical_Gaps'])
+                    with col2:
+                        st.metric("🟠 High", row['High_Gaps'])
+                    with col3:
+                        st.metric("🟡 Medium", row['Medium_Gaps'])
+                    with col4:
+                        st.metric("✅ Matches", len(row['Full_Matches']))
+                    
+                    st.divider()
+                    st.write("**✅ Semantic Matches**")
+                    if row['Full_Matches']:
+                        for m in row['Full_Matches']:
+                            st.write(f"- {m[0]} (Confidence: {m[1]}%)")
+                    else:
+                        st.write("- No strong matches detected.")
