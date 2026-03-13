@@ -427,7 +427,9 @@ if st.button("🚀 Analyze & Rank"):
                 st.divider()
                 
                 # Gaps organized by severity
+                # Gaps organized by severity
                 st.write("**⚠️ Skill Gaps by Priority**")
+                
                 gaps_by_severity = row['Full_Gaps']
                 
                 # CRITICAL GAPS
@@ -436,10 +438,10 @@ if st.button("🚀 Analyze & Rank"):
                     st.markdown("### 🔴 **CRITICAL GAPS** (Deal-breakers)")
                     st.markdown("These are must-have skills or experience levels. Without these, the candidate may not be ready for this role.")
                     for gap in critical_gaps:
-                        st.error(f"**{gap.skill}**")
-                        st.caption(f"Category: {gap.category}")
-                        st.caption(f"Reason: {gap.reason}")
-                        st.caption(f"Frequency: Mentioned {gap.frequency}x in JD")
+                        with st.container():
+                            st.error(f"**{gap.skill}**")
+                            st.caption(f"Category: {gap.category}")
+                            st.caption(f"Reason: {gap.reason}")
                 
                 # HIGH GAPS
                 high_gaps = gaps_by_severity.get("High", [])
@@ -447,10 +449,10 @@ if st.button("🚀 Analyze & Rank"):
                     st.markdown("### 🟠 **HIGH-PRIORITY GAPS** (Strongly Preferred)")
                     st.markdown("Important to have, but candidate could potentially grow into these with training or mentoring.")
                     for gap in high_gaps:
-                        st.warning(f"**{gap.skill}**")
-                        st.caption(f"Category: {gap.category}")
-                        st.caption(f"Reason: {gap.reason}")
-                        st.caption(f"Frequency: Mentioned {gap.frequency}x in JD")
+                        with st.container():
+                            st.warning(f"**{gap.skill}**")
+                            st.caption(f"Category: {gap.category}")
+                            st.caption(f"Reason: {gap.reason}")
                 
                 # MEDIUM GAPS
                 medium_gaps = gaps_by_severity.get("Medium", [])
@@ -458,9 +460,9 @@ if st.button("🚀 Analyze & Rank"):
                     st.markdown("### 🟡 **MEDIUM-PRIORITY GAPS** (Nice-to-Have)")
                     st.markdown("Would be valuable, but not essential. Candidate can likely learn these on the job.")
                     for gap in medium_gaps:
-                        st.info(f"**{gap.skill}**")
-                        st.caption(f"Category: {gap.category}")
-                        st.caption(f"Reason: {gap.reason}")
+                        with st.container():
+                            st.info(f"**{gap.skill}**")
+                            st.caption(f"Reason: {gap.reason}")
                 
                 # LOW GAPS
                 low_gaps = gaps_by_severity.get("Low", [])
@@ -474,8 +476,10 @@ if st.button("🚀 Analyze & Rank"):
                 # Match Confidence Chart
                 if row['Full_Matches']:
                     st.write("**Match Confidence Profile**")
+                    
                     match_data = pd.DataFrame({
                         "Requirement": [m[0][:50] for m in row['Full_Matches']],
                         "Confidence": [m[1] for m in row['Full_Matches']]
                     }).set_index("Requirement")
+                    
                     st.bar_chart(match_data)
