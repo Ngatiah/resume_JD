@@ -90,9 +90,6 @@ class SimpleSeverityAnalyzer:
         self.technical_keywords = {'python', 'sql', 'code', 'api', 'database', 'framework', 'system', 'backend', 'deploy', 'docker'}
         self.stats_keywords = {'statistics', 'math', 'experiment', 'hypothesis', 'regression'}
         self.soft_skills = {'communication', 'leadership', 'team', 'collaboration', 'presentation'}
-        
-        self.critical_keywords = {'must have', 'required', 'essential', 'mandatory', 'strong', 'proven'}
-        self.high_keywords = {'experience', 'proficiency', 'ability', 'understanding'}
     
     def categorize_gap(self, gap):
         gap_lower = gap.lower()
@@ -105,102 +102,22 @@ class SimpleSeverityAnalyzer:
         return "Domain Knowledge"
     
     def get_severity_level(self, requirement, position, frequency, jd_text):
-        """Determine gap severity based on requirement importance"""
-        score = 0
-        reasons = []
-        
-        req_lower = requirement.lower()
-        
-        # Position-based scoring
-        if position < 5:
-            score += 40
-            reasons.append(f"Listed in top {position + 1} requirements")
-        elif position < 10:
-            score += 25
-            reasons.append("Early requirement")
-        else:
-            score += 10
-            reasons.append("Listed in requirements")
-        
-        # Keyword-based scoring
-        if any(kw in req_lower for kw in self.critical_keywords):
-            score += 35
-            reasons.append("Critical requirement")
-        elif any(kw in req_lower for kw in self.high_keywords):
-            score += 20
-            reasons.append("Important requirement")
-        else:
-            score += 10
-            reasons.append("Standard requirement")
-        
-        # Frequency-based scoring
-        if frequency >= 3:
-            score += 20
-            reasons.append(f"Mentioned {frequency}x in JD")
-        elif frequency == 2:
-            score += 10
-            reasons.append("Mentioned multiple times")
-        
-        # Determine severity
-        if score >= 75:
-            return GapSeverity.CRITICAL, "; ".join(reasons)
-        elif score >= 55:
-            return GapSeverity.HIGH, "; ".join(reasons)
+        score = position + frequency * 5
+        if score >= 85:
+            return GapSeverity.CRITICAL, "High priority requirement"
+        elif score >= 60:
+            return GapSeverity.HIGH, "Important requirement"
         elif score >= 35:
-            return GapSeverity.MEDIUM, "; ".join(reasons)
-        else:
-            return GapSeverity.LOW, "; ".join(reasons)
-    
-    def count_requirement_frequency(self, requirement, jd_text):
-        """Count how many times a requirement appears in JD"""
-        keywords = re.findall(r'\b\w{4,}\b', requirement.lower())
-        if not keywords:
-            return 1
-        
-        jd_lower = jd_text.lower()
-        total_count = 0
-        
-        for kw in keywords:
-            count = len(re.findall(r'\b' + re.escape(kw) + r'\b', jd_lower))
-            total_count += count
-        
-        return max(1, total_count // len(keywords))
+            return GapSeverity.MEDIUM, "Moderate requirement"
+        return GapSeverity.LOW, "Optional requirement"
     
     def analyze_all_gaps(self, gaps_dict, jd_requirements, jd_text):
-        """Analyze all gaps with proper severity calculation"""
         organized = {"Critical": [], "High": [], "Medium": [], "Low": []}
-        
-        all_gaps = []
         for category, gap_list in gaps_dict.items():
-            for gap in gap_list:
-                all_gaps.append(gap)
-        
-        for gap in all_gaps:
-            # Find position in requirements
-            position = 0
-            for i, req in enumerate(jd_requirements):
-                if gap.lower() in req.lower() or req.lower() in gap.lower():
-                    position = i
-                    break
-            
-            # Count frequency
-            frequency = self.count_requirement_frequency(gap, jd_text)
-            
-            # Get severity
-            severity, reason = self.get_severity_level(gap, position, frequency, jd_text)
-            
-            # Create gap item
-            gap_item = GapItem(
-                skill=gap,
-                category=self.categorize_gap(gap),
-                severity=severity,
-                reason=reason,
-                frequency=frequency,
-                position=position
-            )
-            
-            organized[severity.value].append(gap_item)
-        
+            for i, gap in enumerate(gap_list):
+                severity, reason = self.get_severity_level(gap, i, 1, jd_text)
+                gap_item = GapItem(skill=gap, category=self.categorize_gap(gap), severity=severity, reason=reason, frequency=1, position=i)
+                organized[severity.value].append(gap_item)
         return organized
     
     def format_gap_report(self, organized):
@@ -274,13 +191,9 @@ def analyze_skills_with_severity(jd_text, resume_text):
             matched.append((skill_name, round(score_val, 2)))
             total_quality_score += 1.0
         elif score_val > 45:
-            # Partial match - show in matches AND add to gaps as weak match
             matched.append((skill_name + " (Partial)", round(score_val, 2)))
             total_quality_score += 0.5
-            # Add to gaps so it shows up in gap severity analysis
-            gaps_basic["Technical"].append(skill_name + " (Weak match)")
         else:
-            # Strong gap - not matched at all
             gaps_basic["Technical"].append(skill_name)
     
     quality_ratio = total_quality_score / len(jd_requirements) if jd_requirements else 0
@@ -362,61 +275,25 @@ def generate_pdf_report(df):
             elements.append(Paragraph("<b><font color=red>🔴 CRITICAL (Deal-breakers):</font></b>", styles['Normal']))
             for gap in gaps_by_severity["Critical"]:
                 elements.append(Paragraph(
-                    f"• {gap.skill}",
+                    f"• {gap.skill}<br/><i>Category: {gap.category}</i>",
                     styles['Normal']
                 ))
-                elements.append(Paragraph(
-                    f"<i>Category: {gap.category}</i>",
-                    styles['Normal']
-                ))
-                elements.append(Paragraph(
-                    f"<i>Reason: {gap.reason}</i>",
-                    styles['Normal']
-                ))
-                elements.append(Paragraph(
-                    f"<i>Frequency: Mentioned {gap.frequency}x in JD</i>",
-                    styles['Normal']
-                ))
-                elements.append(Spacer(1, 6))
+            elements.append(Spacer(1, 6))
         
         if gaps_by_severity.get("High"):
             elements.append(Paragraph("<b><font color=orange>🟠 HIGH (Strongly Preferred):</font></b>", styles['Normal']))
             for gap in gaps_by_severity["High"]:
                 elements.append(Paragraph(
-                    f"• {gap.skill}",
+                    f"• {gap.skill} (Category: {gap.category})",
                     styles['Normal']
                 ))
-                elements.append(Paragraph(
-                    f"<i>Category: {gap.category}</i>",
-                    styles['Normal']
-                ))
-                elements.append(Paragraph(
-                    f"<i>Reason: {gap.reason}</i>",
-                    styles['Normal']
-                ))
-                elements.append(Paragraph(
-                    f"<i>Frequency: Mentioned {gap.frequency}x in JD</i>",
-                    styles['Normal']
-                ))
-                elements.append(Spacer(1, 6))
+            elements.append(Spacer(1, 6))
         
         if gaps_by_severity.get("Medium"):
             elements.append(Paragraph("<b>🟡 MEDIUM (Nice-to-Have):</b>", styles['Normal']))
             for gap in gaps_by_severity["Medium"]:
                 elements.append(Paragraph(f"• {gap.skill}", styles['Normal']))
-                elements.append(Paragraph(
-                    f"<i>Category: {gap.category}</i>",
-                    styles['Normal']
-                ))
-                elements.append(Paragraph(
-                    f"<i>Reason: {gap.reason}</i>",
-                    styles['Normal']
-                ))
-                elements.append(Paragraph(
-                    f"<i>Frequency: Mentioned {gap.frequency}x in JD</i>",
-                    styles['Normal']
-                ))
-                elements.append(Spacer(1, 6))
+            elements.append(Spacer(1, 6))
         
         elements.append(Spacer(1, 12))
         elements.append(Paragraph("---", styles['Normal']))
