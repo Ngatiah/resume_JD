@@ -334,8 +334,8 @@ class EnhancedJDExtractor:
         requirements = self.extract_from_sections(jd_text, include_preferred=True)
         
         if requirements:
-            # return requirements
-            return [r for r in requirements if r and isinstance(r, str) and not self.is_trigger_keyword(r)]
+            return requirements
+            # return [r for r in requirements if r and isinstance(r, str) and not self.is_trigger_keyword(r)]
 
         
         jd_clean = jd_text.lower()
