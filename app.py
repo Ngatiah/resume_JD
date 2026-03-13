@@ -270,6 +270,9 @@ class EnhancedJDExtractor:
         Check if item is just a trigger keyword (section header)
         Returns True if should be FILTERED OUT
         """
+        if not isinstance(item,str):
+            return False
+        
         item_lower = item.lower().strip()
         
         # If item is exactly one of our trigger words, filter it
@@ -311,7 +314,8 @@ class EnhancedJDExtractor:
             items = self.parse_bullets_and_lines(section_content)
             
             for item in items:
-                all_requirements.append(item)
+                if item and isinstance(item,str):
+                    all_requirements.append(item)
         
         # Remove duplicates and trigger keywords
         seen = set()
@@ -330,7 +334,9 @@ class EnhancedJDExtractor:
         requirements = self.extract_from_sections(jd_text, include_preferred=True)
         
         if requirements:
-            return requirements
+            # return requirements
+            return [r for r in requirements if r and isinstance(r, str) and not self.is_trigger_keyword(r)]
+
         
         jd_clean = jd_text.lower()
         earliest_pos = len(jd_text)
