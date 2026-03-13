@@ -228,23 +228,31 @@ class EnhancedJDExtractor:
                 continue
             
             # Remove common bullet formats
-            cleaned = re.sub(
+            # cleaned = re.sub(
+            #     r'^[\s]*'
+            #     r'(?:'
+            #     r'[•\-\*\○\●]'
+            #     r'|'
+            #     r'\d+[.\)]\s*'
+            #     r'|'
+            #     r'[a-zA-Z]\s*[.\)]\s*'
+            #     r'|'
+            #     r'\[\s*[xX\-]\s*\]'
+            #     r')'
+            #     r'\s*',
+            #     '',
+            #     clean_line
+            # )
+            
+            # cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+            pattern = (
                 r'^[\s]*'
                 r'(?:'
-                r'[•\-\*\○\●]'
-                r'|'
-                r'\d+[.\)]\s*'
-                r'|'
-                r'[a-zA-Z]\s*[.\)]\s*'
-                r'|'
-                r'\[\s*[xX\-]\s*\]'
+                # ... multi-line pattern
                 r')'
-                r'\s*',
-                '',
-                clean_line
+                r'\s*'
             )
-            
-            cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+            cleaned = re.sub(pattern, '', clean_line)
             
             if len(cleaned) > 10:
                 parsed_items.append(cleaned)
