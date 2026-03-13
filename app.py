@@ -131,12 +131,12 @@ class EnhancedJDExtractor:
             'optional'
         }
 
-        group 7 : trigger keywords
-        self.blacklist_trigger_words = {
-            'responsibilities', 'requirements', 'qualifications',
-            'skills', 'experience', 'professional', 'education',
-            'background', 'duties', 'accountabilities', ...
-        }
+        # group 7 : trigger keywords
+        # self.blacklist_trigger_words = {
+        #     'responsibilities', 'requirements', 'qualifications',
+        #     'skills', 'experience', 'professional', 'education',
+        #     'background', 'duties', 'accountabilities', ...
+        # }
 
         
         # Combine all for quick lookup
@@ -146,8 +146,9 @@ class EnhancedJDExtractor:
             self.qualification_keywords |
             self.skill_keywords |
             self.experience_keywords |
-            self.preferred_keywords |
-            self.blacklist_trigger_words
+            self.preferred_keywords 
+            # |
+            # self.blacklist_trigger_words
         )
     
     def find_all_sections(self, jd_text: str) -> List[Tuple[str, int, str]]:
@@ -172,8 +173,8 @@ class EnhancedJDExtractor:
                     section_type = 'experience'
                 elif keyword in self.preferred_keywords:
                     section_type = 'preferred'
-                elif keyword in self.blacklist_trigger_words:
-                    section_type = 'trigger_words'
+                # elif keyword in self.blacklist_trigger_words:
+                #     section_type = 'trigger_words'
                 else:
                     section_type = 'other'
                 
@@ -227,12 +228,12 @@ class EnhancedJDExtractor:
         
         return parsed_items
     
-    def is_trigger_keyword(self, item: str) -> bool:
-        """Returns True if item should be filtered out"""
-        if item.lower() in self.blacklist_trigger_words:
-            return True
-        # Also checks if item is mostly trigger words
-        return False
+    # def is_trigger_keyword(self, item: str) -> bool:
+    #     """Returns True if item should be filtered out"""
+    #     if item.lower() in self.blacklist_trigger_words:
+    #         return True
+    #     # Also checks if item is mostly trigger words
+    #     return False
     
     def extract_from_sections(self, jd_text: str, 
                             include_preferred: bool = True,
@@ -240,8 +241,8 @@ class EnhancedJDExtractor:
         """Extract requirements from all identified sections"""
         sections = self.find_all_sections(jd_text)
 
-        if not self.is_trigger_keyword(item):
-            unique_requirements.append(item)
+        # if not self.is_trigger_keyword(item):
+        #     unique_requirements.append(item)
         
         if not sections:
             return self.parse_bullets_and_lines(jd_text)[:max_items]
