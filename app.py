@@ -9,6 +9,7 @@ import torch
 from enum import Enum
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
+from docx import Document
 
 # ============================================
 # SKILL NORMALIZER MAP
@@ -522,11 +523,20 @@ model, scaler, severity_analyzer, jd_extractor = load_assets()
 # HELPER FUNCTIONS
 # ============================================
 
-def extract_text(file):
-    """Extract text from PDF."""
-    pdf = PyPDF2.PdfReader(file)
-    return " ".join([page.extract_text() or "" for page in pdf.pages])
+# def extract_text(file):
+#     """Extract text from PDF."""
+#     pdf = PyPDF2.PdfReader(file)
+#     return " ".join([page.extract_text() or "" for page in pdf.pages])
 
+def extract_text(file):
+    if file.name.endswith('.pdf'):
+        pdf = PyPDF2.PdfReader(file)
+        return " ".join([page.extract_text() or "" for page in pdf.pages])
+    elif file.name.endswith('.docx'):
+        from docx import Document
+        doc = Document(file)
+        return " ".join([p.text for p in doc.paragraphs])
+    return ""
 
 def chunk_resume(resume_text):
     """Split resume into meaningful chunks."""
