@@ -1,0 +1,593 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from sentence_transformers import SentenceTransformer, util
+import PyPDF2
+import joblib
+import re
+import torch
+from enum import Enum
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
+
+# ============================================
+# SIMPLE JD EXTRACTOR - NO REGEX ISSUES
+# ============================================
+
+class SimpleJDExtractor:
+    def __init__(self):
+        self.blacklist = {
+            'responsibilities', 'responsibility', 'requirements', 'requirement', 
+            'qualifications', 'qualification', 'skills', 'skill', 'experience', 
+            'professional', 'education', 'background', 'duties'
+        }
+    
+    def is_trigger_keyword(self, item):
+        if not isinstance(item, str):
+            return False
+        return item.lower().strip() in self.blacklist
+    
+    def parse_bullets_and_lines(self, text):
+        """Simple extraction without complex regex"""
+        lines = text.split('\n')
+        parsed_items = []
+        
+        for line in lines:
+            clean_line = line.strip()
+            
+            # Skip empty, too short, or header lines
+            if not clean_line or len(clean_line) < 10 or clean_line.endswith(':'):
+                continue
+            
+            # Remove leading bullet points manually
+            if clean_line[0] in '•-*○●':
+                clean_line = clean_line[1:].strip()
+            
+            # Remove numbered bullets like "1. " or "a) "
+            if len(clean_line) > 2:
+                if clean_line[0].isdigit() and clean_line[1] in '.) ':
+                    clean_line = clean_line[2:].strip()
+                elif clean_line[0].isalpha() and clean_line[1] in '.) ':
+                    clean_line = clean_line[2:].strip()
+            
+            # Add if still valid
+            if len(clean_line) > 10 and clean_line not in parsed_items:
+                parsed_items.append(clean_line)
+        
+        return parsed_items
+    
+    def extract_jd_optimized(self, jd_text):
+        """Extract requirements, filtering out trigger keywords"""
+        items = self.parse_bullets_and_lines(jd_text)
+        # Filter out trigger keywords
+        filtered = [item for item in items if not self.is_trigger_keyword(item)]
+        return filtered[:25]
+
+
+# ============================================
+# GAP SEVERITY
+# ============================================
+
+class GapSeverity(Enum):
+    CRITICAL = "Critical"
+    HIGH = "High"
+    MEDIUM = "Medium"
+    LOW = "Low"
+
+
+@dataclass
+class GapItem:
+    skill: str
+    category: str
+    severity: GapSeverity
+    reason: str
+    frequency: int
+    position: int
+
+
+class SimpleSeverityAnalyzer:
+    def __init__(self):
+        self.technical_keywords = {'python', 'sql', 'code', 'api', 'database', 'framework', 'system', 'backend', 'deploy', 'docker'}
+        self.stats_keywords = {'statistics', 'math', 'experiment', 'hypothesis', 'regression'}
+        self.soft_skills = {'communication', 'leadership', 'team', 'collaboration', 'presentation'}
+        
+        self.critical_keywords = {'must have', 'required', 'essential', 'mandatory', 'strong', 'proven'}
+        self.high_keywords = {'experience', 'proficiency', 'ability', 'understanding'}
+    
+    def categorize_gap(self, gap):
+        gap_lower = gap.lower()
+        if any(kw in gap_lower for kw in self.technical_keywords):
+            return "Technical"
+        elif any(kw in gap_lower for kw in self.stats_keywords):
+            return "Statistics"
+        elif any(kw in gap_lower for kw in self.soft_skills):
+            return "Soft Skills"
+        return "Domain Knowledge"
+    
+    def get_severity_level(self, requirement, position, frequency, jd_text):
+        """Determine gap severity based on requirement importance"""
+        score = 0
+        reasons = []
+        
+        req_lower = requirement.lower()
+        
+        # Position-based scoring
+        if position < 5:
+            score += 40
+            reasons.append(f"Listed in top {position + 1} requirements")
+        elif position < 10:
+            score += 25
+            reasons.append("Early requirement")
+        else:
+            score += 10
+            reasons.append("Listed in requirements")
+        
+        # Keyword-based scoring
+        if any(kw in req_lower for kw in self.critical_keywords):
+            score += 35
+            reasons.append("Critical requirement")
+        elif any(kw in req_lower for kw in self.high_keywords):
+            score += 20
+            reasons.append("Important requirement")
+        else:
+            score += 10
+            reasons.append("Standard requirement")
+        
+        # Frequency-based scoring
+        if frequency >= 3:
+            score += 20
+            reasons.append(f"Mentioned {frequency}x in JD")
+        elif frequency == 2:
+            score += 10
+            reasons.append("Mentioned multiple times")
+        
+        # Determine severity
+        if score >= 75:
+            return GapSeverity.CRITICAL, "; ".join(reasons)
+        elif score >= 55:
+            return GapSeverity.HIGH, "; ".join(reasons)
+        elif score >= 35:
+            return GapSeverity.MEDIUM, "; ".join(reasons)
+        else:
+            return GapSeverity.LOW, "; ".join(reasons)
+    
+    def count_requirement_frequency(self, requirement, jd_text):
+        """Count how many times a requirement appears in JD"""
+        keywords = re.findall(r'\b\w{4,}\b', requirement.lower())
+        if not keywords:
+            return 1
+        
+        jd_lower = jd_text.lower()
+        total_count = 0
+        
+        for kw in keywords:
+            count = len(re.findall(r'\b' + re.escape(kw) + r'\b', jd_lower))
+            total_count += count
+        
+        return max(1, total_count // len(keywords))
+    
+    def analyze_all_gaps(self, gaps_dict, jd_requirements, jd_text):
+        """Analyze all gaps with proper severity calculation"""
+        organized = {"Critical": [], "High": [], "Medium": [], "Low": []}
+        
+        all_gaps = []
+        for category, gap_list in gaps_dict.items():
+            for gap in gap_list:
+                all_gaps.append(gap)
+        
+        for gap in all_gaps:
+            # Find position in requirements
+            position = 0
+            for i, req in enumerate(jd_requirements):
+                if gap.lower() in req.lower() or req.lower() in gap.lower():
+                    position = i
+                    break
+            
+            # Count frequency
+            frequency = self.count_requirement_frequency(gap, jd_text)
+            
+            # Get severity
+            severity, reason = self.get_severity_level(gap, position, frequency, jd_text)
+            
+            # Create gap item
+            gap_item = GapItem(
+                skill=gap,
+                category=self.categorize_gap(gap),
+                severity=severity,
+                reason=reason,
+                frequency=frequency,
+                position=position
+            )
+            
+            organized[severity.value].append(gap_item)
+        
+        return organized
+    
+    def format_gap_report(self, organized):
+        report = []
+        for level in ["Critical", "High", "Medium", "Low"]:
+            gaps = organized.get(level, [])
+            if gaps:
+                report.append(f"\n{level} Gaps ({len(gaps)})")
+                for gap in gaps:
+                    report.append(f"  • {gap.skill}")
+        return "\n".join(report)
+
+
+# ============================================
+# STREAMLIT APP
+# ============================================
+
+st.set_page_config(page_title="AI Resume Job Matcher", layout="wide")
+
+@st.cache_resource
+def load_assets():
+    model = SentenceTransformer('iwamu/bert-data-analyst-matcher')
+    scaler = joblib.load('semantic_scaler_2.pkl')
+    return model, scaler, SimpleSeverityAnalyzer(), SimpleJDExtractor()
+
+try:
+    model, scaler, severity_analyzer, jd_extractor = load_assets()
+except Exception as e:
+    st.error(f"Error loading assets: {e}")
+    st.stop()
+
+
+def extract_text(file):
+    """Extract text from PDF"""
+    pdf = PyPDF2.PdfReader(file)
+    return " ".join([page.extract_text() or "" for page in pdf.pages])
+
+
+def chunk_resume(resume_text):
+    """Split resume into chunks"""
+    chunks = re.split(r'[,.\n•●/-]', resume_text)
+    return [c.strip() for c in chunks if len(c.strip()) > 3]
+
+
+def analyze_skills_with_severity(jd_text, resume_text):
+    """Analyze skills with severity"""
+    jd_requirements = jd_extractor.extract_jd_optimized(jd_text)
+    resume_chunks = chunk_resume(resume_text)
+    
+    if not jd_requirements or not resume_chunks:
+        return {
+            "matches": [],
+            "gaps_by_severity": {"Critical": [], "High": [], "Medium": [], "Low": []},
+            "quality_ratio": 0.0
+        }
+    
+    jd_embs = model.encode(jd_requirements, convert_to_tensor=True)
+    res_embs = model.encode(resume_chunks, convert_to_tensor=True)
+    cosine_scores = util.cos_sim(jd_embs, res_embs)
+    max_scores, _ = torch.max(cosine_scores, dim=1)
+    
+    matched = []
+    gaps_basic = {"Technical": [], "Stats": [], "Soft Skills": []}
+    total_quality_score = 0
+    
+    for i, score in enumerate(max_scores):
+        skill_name = jd_requirements[i]
+        score_val = score.item() * 100
+        
+        if score_val > 60:
+            matched.append((skill_name, round(score_val, 2)))
+            total_quality_score += 1.0
+        elif score_val > 45:
+            # Partial match - show in matches AND add to gaps as weak match
+            matched.append((skill_name + " (Partial)", round(score_val, 2)))
+            total_quality_score += 0.5
+            # Add to gaps so it shows up in gap severity analysis
+            gaps_basic["Technical"].append(skill_name + " (Weak match)")
+        else:
+            # Strong gap - not matched at all
+            gaps_basic["Technical"].append(skill_name)
+    
+    quality_ratio = total_quality_score / len(jd_requirements) if jd_requirements else 0
+    severity_organized = severity_analyzer.analyze_all_gaps(gaps_basic, jd_requirements, jd_text)
+    
+    return {
+        "matches": matched,
+        "gaps_by_severity": severity_organized,
+        "quality_ratio": quality_ratio
+    }
+
+
+def calculate_seniority_bonus(text):
+    """Calculate experience bonus"""
+    experience_matches = re.findall(r'(\d+)\+?\s*(?:years|yrs)', text.lower())
+    if experience_matches:
+        years = max([int(x) for x in experience_matches])
+        if years >= 10:
+            return 15
+        if years >= 3:
+            return 10
+    return 0
+
+
+def generate_pdf_report(df):
+    """Generate downloadable PDF report with gap severity details"""
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.pagesizes import A4
+    from io import BytesIO
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    elements.append(Paragraph("<b>Ranked Candidate Audit Report (With Gap Severity)</b>", styles['Heading1']))
+    elements.append(Spacer(1, 12))
+
+    for idx, row in df.reset_index(drop=True).iterrows():
+        
+        elements.append(Paragraph(
+            f"<b>Rank {idx+1}: {row['Candidate']}</b>",
+            styles['Heading2']
+        ))
+        
+        elements.append(Paragraph(
+            f"<b>Overall Match Score:</b> {row['Match Score']:.2f}%",
+            styles['Normal']
+        ))
+        
+        elements.append(Paragraph(
+            f"<b>Gap Severity Summary:</b> 🔴 Critical: {row['Critical_Gaps']} | "
+            f"🟠 High: {row['High_Gaps']} | 🟡 Medium: {row['Medium_Gaps']}",
+            styles['Normal']
+        ))
+        elements.append(Spacer(1, 10))
+        
+        # Matches
+        elements.append(Paragraph("<b>✅ Semantic Matches:</b>", styles['Normal']))
+        if row["Full_Matches"]:
+            for m in row["Full_Matches"]:
+                elements.append(Paragraph(
+                    f"• {m[0]} (Confidence: {m[1]}%)",
+                    styles['Normal']
+                ))
+        else:
+            elements.append(Paragraph("• No strong matches detected.", styles['Normal']))
+        
+        elements.append(Spacer(1, 12))
+        
+        # Severity-organized gaps
+        elements.append(Paragraph("<b>⚠️ Gaps by Severity:</b>", styles['Normal']))
+        elements.append(Spacer(1, 4))
+        
+        gaps_by_severity = row["Full_Gaps"]
+        
+        if gaps_by_severity.get("Critical"):
+            elements.append(Paragraph("<b><font color=red>🔴 CRITICAL (Deal-breakers):</font></b>", styles['Normal']))
+            for gap in gaps_by_severity["Critical"]:
+                elements.append(Paragraph(
+                    f"• {gap.skill}",
+                    styles['Normal']
+                ))
+                elements.append(Paragraph(
+                    f"<i>Category: {gap.category}</i>",
+                    styles['Normal']
+                ))
+                elements.append(Paragraph(
+                    f"<i>Reason: {gap.reason}</i>",
+                    styles['Normal']
+                ))
+                elements.append(Paragraph(
+                    f"<i>Frequency: Mentioned {gap.frequency}x in JD</i>",
+                    styles['Normal']
+                ))
+                elements.append(Spacer(1, 6))
+        
+        if gaps_by_severity.get("High"):
+            elements.append(Paragraph("<b><font color=orange>🟠 HIGH (Strongly Preferred):</font></b>", styles['Normal']))
+            for gap in gaps_by_severity["High"]:
+                elements.append(Paragraph(
+                    f"• {gap.skill}",
+                    styles['Normal']
+                ))
+                elements.append(Paragraph(
+                    f"<i>Category: {gap.category}</i>",
+                    styles['Normal']
+                ))
+                elements.append(Paragraph(
+                    f"<i>Reason: {gap.reason}</i>",
+                    styles['Normal']
+                ))
+                elements.append(Paragraph(
+                    f"<i>Frequency: Mentioned {gap.frequency}x in JD</i>",
+                    styles['Normal']
+                ))
+                elements.append(Spacer(1, 6))
+        
+        if gaps_by_severity.get("Medium"):
+            elements.append(Paragraph("<b>🟡 MEDIUM (Nice-to-Have):</b>", styles['Normal']))
+            for gap in gaps_by_severity["Medium"]:
+                elements.append(Paragraph(f"• {gap.skill}", styles['Normal']))
+                elements.append(Paragraph(
+                    f"<i>Category: {gap.category}</i>",
+                    styles['Normal']
+                ))
+                elements.append(Paragraph(
+                    f"<i>Reason: {gap.reason}</i>",
+                    styles['Normal']
+                ))
+                elements.append(Paragraph(
+                    f"<i>Frequency: Mentioned {gap.frequency}x in JD</i>",
+                    styles['Normal']
+                ))
+                elements.append(Spacer(1, 6))
+        
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("---", styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+
+# ============================================
+# UI LAYOUT
+# ============================================
+
+st.title("🎯 Semantic Resume-JD Matcher with Gap Severity")
+st.markdown("Rank resumes based on **meaning** and see exactly what's missing with priority levels.")
+
+with st.sidebar:
+    st.header("Step 1: Job Description")
+    jd_input = st.text_area("Paste the Job Description here:", height=300)
+    
+    if st.checkbox("Debug: Show extracted requirements"):
+        if jd_input:
+            extracted = jd_extractor.extract_jd_optimized(jd_input)
+            st.write(f"**Found {len(extracted)} requirements (trigger keywords filtered):**")
+            for i, req in enumerate(extracted, 1):
+                st.caption(f"{i}. {req}")
+
+st.header("Step 2: Upload Resumes")
+uploaded_files = st.file_uploader("Upload candidate PDFs", type="pdf", accept_multiple_files=True)
+
+if st.button("🚀 Analyze & Rank"):
+    if not jd_input or not uploaded_files:
+        st.error("Please provide both a JD and at least one resume.")
+    else:
+        results = []
+        with st.spinner("Performing Deep Semantic Audit..."):
+            jd_emb = model.encode(jd_input, convert_to_tensor=True)
+            for file in uploaded_files:
+                try:
+                    text = extract_text(file)
+                    
+                    res_emb = model.encode(text, convert_to_tensor=True)
+                    raw_sim = util.cos_sim(jd_emb, res_emb).item()
+                    
+                    result = analyze_skills_with_severity(jd_input, text)
+                    matches = result["matches"]
+                    gaps_by_severity = result["gaps_by_severity"]
+                    quality_ratio = result["quality_ratio"]
+                    
+                    bonus = calculate_seniority_bonus(text)
+                    final_score = (raw_sim * 25) + (quality_ratio * 65) + bonus
+                    final_score = float(np.clip(final_score, 0, 100))
+                    
+                    critical_count = len(gaps_by_severity.get("Critical", []))
+                    high_count = len(gaps_by_severity.get("High", []))
+                    medium_count = len(gaps_by_severity.get("Medium", []))
+                    
+                    results.append({
+                        "Candidate": file.name,
+                        "Match Score": final_score,
+                        "Matches": ", ".join([f"{m[0]} ({m[1]}%)" for m in matches]) if matches else "None",
+                        "Critical_Gaps": critical_count,
+                        "High_Gaps": high_count,
+                        "Medium_Gaps": medium_count,
+                        "Full_Matches": matches,
+                        "Full_Gaps": gaps_by_severity,
+                    })
+                except Exception as e:
+                    st.error(f"Error processing {file.name}: {e}")
+                    continue
+        
+        # Create Result DataFrame
+        df = pd.DataFrame(results).sort_values(by="Match Score", ascending=False)
+        
+        st.success(f"✅ Analysis Complete! Top candidate: {df.iloc[0]['Candidate']}")
+        st.divider()
+        
+        # Download PDF Report
+        pdf_buffer = generate_pdf_report(df)
+        st.download_button(
+            label="📄 Download Full Ranking Report (PDF)",
+            data=pdf_buffer,
+            file_name="Ranked_Candidates_Audit.pdf",
+            mime="application/pdf"
+        )
+        
+        st.divider()
+        
+        # Individual Candidate Audits with Gap Severity
+        st.subheader("🔍 Individual Candidate Audit")
+        for _, row in df.iterrows():
+            with st.expander(f"Audit: {row['Candidate']} ({row['Match Score']:.2f}%)"):
+                
+                # Quick metrics
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("🔴 Critical", row['Critical_Gaps'])
+                with col2:
+                    st.metric("🟠 High", row['High_Gaps'])
+                with col3:
+                    st.metric("🟡 Medium", row['Medium_Gaps'])
+                with col4:
+                    st.metric("✅ Matches", len(row['Full_Matches']))
+                
+                st.divider()
+                
+                # Semantic Matches
+                st.write("**✅ Semantic Matches**")
+                if row['Full_Matches']:
+                    for m in row['Full_Matches']:
+                        st.write(f"- {m[0]} (Confidence: {m[1]}%)")
+                else:
+                    st.write("- No strong matches detected.")
+                
+                st.divider()
+                
+                # Gaps organized by severity
+                st.write("**⚠️ Skill Gaps by Priority**")
+                gaps_by_severity = row['Full_Gaps']
+                
+                # CRITICAL GAPS
+                critical_gaps = gaps_by_severity.get("Critical", [])
+                if critical_gaps:
+                    st.markdown("### 🔴 **CRITICAL GAPS** (Deal-breakers)")
+                    st.markdown("These are must-have skills or experience levels. Without these, the candidate may not be ready for this role.")
+                    for gap in critical_gaps:
+                        st.error(f"**{gap.skill}**")
+                        st.caption(f"Category: {gap.category}")
+                        st.caption(f"Reason: {gap.reason}")
+                        st.caption(f"Frequency: Mentioned {gap.frequency}x in JD")
+                
+                # HIGH GAPS
+                high_gaps = gaps_by_severity.get("High", [])
+                if high_gaps:
+                    st.markdown("### 🟠 **HIGH-PRIORITY GAPS** (Strongly Preferred)")
+                    st.markdown("Important to have, but candidate could potentially grow into these with training or mentoring.")
+                    for gap in high_gaps:
+                        st.warning(f"**{gap.skill}**")
+                        st.caption(f"Category: {gap.category}")
+                        st.caption(f"Reason: {gap.reason}")
+                        st.caption(f"Frequency: Mentioned {gap.frequency}x in JD")
+                
+                # MEDIUM GAPS
+                medium_gaps = gaps_by_severity.get("Medium", [])
+                if medium_gaps:
+                    st.markdown("### 🟡 **MEDIUM-PRIORITY GAPS** (Nice-to-Have)")
+                    st.markdown("Would be valuable, but not essential. Candidate can likely learn these on the job.")
+                    for gap in medium_gaps:
+                        st.info(f"**{gap.skill}**")
+                        st.caption(f"Category: {gap.category}")
+                        st.caption(f"Reason: {gap.reason}")
+                        st.caption(f"Frequency: Mentioned {gap.frequency}x in JD")
+                
+                # LOW GAPS
+                low_gaps = gaps_by_severity.get("Low", [])
+                if low_gaps and st.checkbox(f"Show Low-Priority gaps for {row['Candidate']}", key=f"low_{row['Candidate']}"):
+                    st.markdown("### 🟢 **LOW-PRIORITY GAPS** (Learning Opportunity)")
+                    for gap in low_gaps:
+                        st.write(f"- {gap.skill}")
+                        st.caption(f"Category: {gap.category}")
+                        st.caption(f"Reason: {gap.reason}")
+                        st.caption(f"Frequency: Mentioned {gap.frequency}x in JD")
+                
+                st.divider()
+                
+                # Match Confidence Chart
+                if row['Full_Matches']:
+                    st.write("**Match Confidence Profile**")
+                    match_data = pd.DataFrame({
+                        "Requirement": [m[0][:50] for m in row['Full_Matches']],
+                        "Confidence": [m[1] for m in row['Full_Matches']]
+                    }).set_index("Requirement")
+                    st.bar_chart(match_data)
