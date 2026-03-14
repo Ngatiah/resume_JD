@@ -528,15 +528,25 @@ model, scaler, severity_analyzer, jd_extractor = load_assets()
 #     pdf = PyPDF2.PdfReader(file)
 #     return " ".join([page.extract_text() or "" for page in pdf.pages])
 
+# def extract_text(file):
+#     if file.name.endswith('.pdf'):
+#         pdf = PyPDF2.PdfReader(file)
+#         return " ".join([page.extract_text() or "" for page in pdf.pages])
+#     elif file.name.endswith('.docx'):
+#         from docx import Document
+#         doc = Document(file)
+#         return " ".join([p.text for p in doc.paragraphs])
+#     return ""
+
 def extract_text(file):
-    if file.name.endswith('.pdf'):
+    """Extract text from PDF or DOCX."""
+    if file.name.lower().endswith('.docx'):
+        from docx import Document as DocxDocument
+        doc = DocxDocument(file)
+        return " ".join([p.text for p in doc.paragraphs if p.text.strip()])
+    else:
         pdf = PyPDF2.PdfReader(file)
         return " ".join([page.extract_text() or "" for page in pdf.pages])
-    elif file.name.endswith('.docx'):
-        from docx import Document
-        doc = Document(file)
-        return " ".join([p.text for p in doc.paragraphs])
-    return ""
 
 def chunk_resume(resume_text):
     """Split resume into meaningful chunks."""
