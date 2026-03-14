@@ -472,29 +472,20 @@ class GapSeverityAnalyzer:
                 return i
         return len(requirements)
 
-    def format_gap_report(self, severity_organized):
+    def format_gap_report(self, severity_organized: Dict[str, List[GapItem]]) -> str:
         report = []
-        severity_labels = {
-            "Critical": "[CRITICAL]",
-            "High":     "[HIGH]",
-            "Medium":   "[MEDIUM]",
-            "Low":      "[LOW]"
-        }
+        severity_colors = {"Critical": "🔴", "High": "🟠", "Medium": "🟡", "Low": "🟢"}
         for level in ["Critical", "High", "Medium", "Low"]:
             gaps = severity_organized.get(level, [])
             if not gaps:
                 continue
-            report.append(f"\n{severity_labels[level]} {level} Gaps ({len(gaps)})")
+            report.append(f"\n{severity_colors[level]} {level} Gaps ({len(gaps)})")
             report.append("-" * 60)
             for gap in gaps:
-                skill     = getattr(gap, 'skill', 'Unknown skill')
-                raw_skill = getattr(gap, 'raw_skill', skill)
-                category  = getattr(gap, 'category', 'Unknown')
-                reason    = getattr(gap, 'reason', 'No additional context available.')
-                report.append(f"\n  Skill: {skill}")
-                report.append(f"  In context of: {raw_skill}")
-                report.append(f"  Category: {category}")
-                report.append(f"  Recruiter Note: {reason}")
+                report.append(f"\n  • {gap.skill}")
+                report.append(f"    In context of: {gap.raw_skill}")
+                report.append(f"    Category: {gap.category}")
+                report.append(f"    Recruiter Note: {gap.reason}")
         return "\n".join(report)
 
 
@@ -842,17 +833,6 @@ if st.button("🚀 Analyze & Rank"):
                 st.write("**⚠️ Skill Gaps by Priority**")
                 gaps_by_severity = row['Full_Gaps']
 
-                def render_gap(gap, render_fn):
-                    """Safely render a GapItem using getattr fallbacks."""
-                    skill     = getattr(gap, 'skill', 'Unknown skill')
-                    raw_skill = getattr(gap, 'raw_skill', skill)
-                    category  = getattr(gap, 'category', 'Unknown')
-                    reason    = getattr(gap, 'reason', 'No additional context available.')
-                    render_fn(skill)
-                    st.caption(f"In context of: _{raw_skill}_")
-                    st.caption(f"Category: {category}")
-                    st.caption(f"Recruiter Note: {reason}")
-
                 critical_gaps = gaps_by_severity.get("Critical", [])
                 if critical_gaps:
                     st.markdown("### 🔴 CRITICAL GAPS (Deal-breakers)")
@@ -861,7 +841,10 @@ if st.button("🚀 Analyze & Rank"):
                         "Without these, the candidate may not be ready for this role."
                     )
                     for gap in critical_gaps:
-                        render_gap(gap, lambda s: st.error(f"**{s}**"))
+                        st.error(f"**{gap.skill}**")
+                        st.caption(f"In context of: _{gap.raw_skill}_")
+                        st.caption(f"Category: {gap.category}")
+                        st.caption(f"Recruiter Note: {gap.reason}")
 
                 high_gaps = gaps_by_severity.get("High", [])
                 if high_gaps:
@@ -871,7 +854,10 @@ if st.button("🚀 Analyze & Rank"):
                         "with 3–6 months of structured onboarding."
                     )
                     for gap in high_gaps:
-                        render_gap(gap, lambda s: st.warning(f"**{s}**"))
+                        st.warning(f"**{gap.skill}**")
+                        st.caption(f"In context of: _{gap.raw_skill}_")
+                        st.caption(f"Category: {gap.category}")
+                        st.caption(f"Recruiter Note: {gap.reason}")
 
                 medium_gaps = gaps_by_severity.get("Medium", [])
                 if medium_gaps:
@@ -881,7 +867,9 @@ if st.button("🚀 Analyze & Rank"):
                         "Candidate can likely learn these on the job."
                     )
                     for gap in medium_gaps:
-                        render_gap(gap, lambda s: st.info(f"**{s}**"))
+                        st.info(f"**{gap.skill}**")
+                        st.caption(f"In context of: _{gap.raw_skill}_")
+                        st.caption(f"Recruiter Note: {gap.reason}")
 
                 low_gaps = gaps_by_severity.get("Low", [])
                 if low_gaps and st.checkbox(
@@ -890,9 +878,7 @@ if st.button("🚀 Analyze & Rank"):
                 ):
                     st.markdown("### 🟢 LOW-PRIORITY GAPS (Learning Opportunity)")
                     for gap in low_gaps:
-                        skill     = getattr(gap, 'skill', 'Unknown skill')
-                        raw_skill = getattr(gap, 'raw_skill', skill)
-                        st.write(f"- **{skill}** _(context: {raw_skill})_")
+                        st.write(f"- **{gap.skill}** _(context: {gap.raw_skill})_")
 
                 st.divider()
 
