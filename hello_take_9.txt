@@ -592,20 +592,6 @@ def calculate_seniority_bonus(text):
     return 0
 
 
-def sanitize_for_pdf(text: str) -> str:
-    """
-    Escape characters that break ReportLab's XML parser.
-    Also strips markdown bold markers (**) since ReportLab
-    uses its own tag syntax.
-    """
-    text = str(text)
-    text = text.replace('**', '')        # strip markdown bold
-    text = text.replace('&', '&amp;')   # must come first
-    text = text.replace('<', '&lt;')
-    text = text.replace('>', '&gt;')
-    return text
-
-
 def generate_pdf_report(df):
     """Generate downloadable PDF report."""
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
@@ -626,7 +612,7 @@ def generate_pdf_report(df):
 
     for idx, row in df.reset_index(drop=True).iterrows():
         elements.append(Paragraph(
-            f"<b>Rank {idx+1}: {sanitize_for_pdf(row['Candidate'])}</b>",
+            f"<b>Rank {idx+1}: {row['Candidate']}</b>",
             styles['Heading2']
         ))
         elements.append(Paragraph(
@@ -634,69 +620,49 @@ def generate_pdf_report(df):
             styles['Normal']
         ))
         elements.append(Paragraph(
-            f"<b>Gap Severity Summary:</b> "
-            f"[CRITICAL] {row['Critical_Gaps']} | "
-            f"[HIGH] {row['High_Gaps']} | "
-            f"[MEDIUM] {row['Medium_Gaps']}",
+            f"<b>Gap Severity Summary:</b> 🔴 Critical: {row['Critical_Gaps']} | "
+            f"🟠 High: {row['High_Gaps']} | 🟡 Medium: {row['Medium_Gaps']}",
             styles['Normal']
         ))
         elements.append(Spacer(1, 10))
 
         # Matches
-        elements.append(Paragraph("<b>Semantic Matches:</b>", styles['Normal']))
+        elements.append(Paragraph("<b>✅ Semantic Matches:</b>", styles['Normal']))
         if row["Full_Matches"]:
             for m in row["Full_Matches"]:
                 elements.append(Paragraph(
-                    f"- {sanitize_for_pdf(m[0])} (Confidence: {m[1]}%)",
+                    f"• {m[0]} (Confidence: {m[1]}%)",
                     styles['Normal']
                 ))
         else:
-            elements.append(Paragraph("- No strong matches detected.", styles['Normal']))
+            elements.append(Paragraph("• No strong matches detected.", styles['Normal']))
 
         elements.append(Spacer(1, 12))
-        elements.append(Paragraph("<b>Gaps by Severity:</b>", styles['Normal']))
+        elements.append(Paragraph("<b>⚠️ Gaps by Severity:</b>", styles['Normal']))
         elements.append(Spacer(1, 4))
 
         gaps_by_severity = row["Full_Gaps"]
         severity_config = [
-            ("Critical", "<font color=red><b>CRITICAL GAPS (Deal-breakers):</b></font>"),
-            ("High",     "<font color=orange><b>HIGH-PRIORITY GAPS (Strongly Preferred):</b></font>"),
-            ("Medium",   "<b>MEDIUM-PRIORITY GAPS (Nice-to-Have):</b>"),
+            ("Critical", "<font color=red>🔴 CRITICAL (Deal-breakers):</font>"),
+            ("High",     "<font color=orange>🟠 HIGH (Strongly Preferred):</font>"),
+            ("Medium",   "🟡 MEDIUM (Nice-to-Have):"),
         ]
 
         for level, label in severity_config:
             level_gaps = gaps_by_severity.get(level, [])
             if level_gaps:
-                elements.append(Paragraph(label, styles['Normal']))
-                elements.append(Spacer(1, 4))
+                elements.append(Paragraph(f"<b>{label}</b>", styles['Normal']))
                 for gap in level_gaps:
-                    # Sanitize each field individually before composing
-                    skill_clean     = sanitize_for_pdf(getattr(gap, 'skill', ''))
-                    raw_skill_clean = sanitize_for_pdf(getattr(gap, 'raw_skill', skill_clean))
-                    reason_clean    = sanitize_for_pdf(getattr(gap, 'reason', ''))
-                    category_clean  = sanitize_for_pdf(getattr(gap, 'category', ''))
-
                     elements.append(Paragraph(
-                        f"<b>{skill_clean}</b>",
+                        f"• <b>{gap.skill}</b><br/>"
+                        f"<i>In context of: {gap.raw_skill}</i><br/>"
+                        f"<i>Recruiter Note: {gap.reason}</i>",
                         styles['Normal']
                     ))
-                    elements.append(Paragraph(
-                        f"In context of: {raw_skill_clean}",
-                        styles['Normal']
-                    ))
-                    elements.append(Paragraph(
-                        f"Category: {category_clean}",
-                        styles['Normal']
-                    ))
-                    elements.append(Paragraph(
-                        f"Recruiter Note: {reason_clean}",
-                        styles['Normal']
-                    ))
-                    elements.append(Spacer(1, 6))
-                elements.append(Spacer(1, 4))
+                elements.append(Spacer(1, 6))
 
         elements.append(Spacer(1, 12))
-        elements.append(Paragraph("_" * 60, styles['Normal']))
+        elements.append(Paragraph("---", styles['Normal']))
         elements.append(Spacer(1, 12))
 
     doc.build(elements)
